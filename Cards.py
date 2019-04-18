@@ -1,4 +1,4 @@
-READINGCARDS = [ReadingCard("Starbucks","Coffee"),
+READING_CARDS = [ReadingCard("Starbucks","Coffee"),
                 ReadingCard("Justin","Bieber"),
                 ReadingCard("Abraham","Lincoln"),
                 ReadingCard("George","Washington"),
@@ -100,30 +100,11 @@ READINGCARDS = [ReadingCard("Starbucks","Coffee"),
                 ReadingCard("Solar","System")]
 
 class ReadingCard:
-    def __init__(self, first_Word , second_Word):
-        self.firstWord = first_Word
-        self.secondWord = second_Word
+    def __init__(self, firstWord , lastWord):
+        self.firstWord = firstWord
+        self.secondWord = lastWord
 
-class GuessingCard:
-    def __intit__(self,guessing_Word):
-        self.guessingWord = guessing_Word
-
-"""
-asfckana
-asfvsgvg
-dgva
-
-"""
-# git add "filename"
-# git commit -m "message"
-# git push origin master
-
-# python "filename" run the file
-# ls list the document in the file
-# cd "foldername" open the folder
-# cd ..  back
-# mkdir make a new folder in the current folder
-# rm "filename" remove the file in current folder
-# rm ../"filename" remove the file in back folder
-# rm -rf "foldername" remove folder in current folder
+class GrabbingCard:
+    def __intit__(self,lastWord):
+        self.grabbingWord = lastWord
 
