@@ -8,7 +8,7 @@ class ReadingCard:
 
 class GrabbingCard:
     def __init__(self, lastWord):
-        self.grabbingWord = lastWord
+        self.lastWord = lastWord
 
 READING_CARDS = [ReadingCard("Starbucks","Coffee"),
                  ReadingCard("Justin","Bieber"),
@@ -112,6 +112,6 @@ READING_CARDS = [ReadingCard("Starbucks","Coffee"),
                  ReadingCard("Solar","System")]
 
 def generateGrabbingCardList(readingCardList):
-    output = [GrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
+    return [GrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
 
 GRABBING_CARDS = generateGrabbingCardList(READING_CARDS)
