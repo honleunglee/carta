@@ -1,2 +1,4 @@
+import Cards
+
 if __name__ == "__main__":
-    print('Goof night!')
+    print('Good night!')

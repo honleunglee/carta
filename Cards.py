@@ -1,3 +1,15 @@
+class ReadingCard:
+    def __init__(self, firstWord, lastWord):
+        self.firstWord = firstWord
+        self.lastWord  = lastWord
+
+    def getLastWord(self):
+        return self.lastWord
+
+class GrabbingCard:
+    def __init__(self, lastWord):
+        self.grabbingWord = lastWord
+
 READING_CARDS = [ReadingCard("Starbucks","Coffee"),
                  ReadingCard("Justin","Bieber"),
                  ReadingCard("Abraham","Lincoln"),
@@ -99,12 +111,7 @@ READING_CARDS = [ReadingCard("Starbucks","Coffee"),
                  ReadingCard("North","Pole"),
                  ReadingCard("Solar","System")]
 
-class ReadingCard:
-    def __init__(self, firstWord , lastWord):
-        self.firstWord = firstWord
-        self.secondWord = lastWord
+def generateGrabbingCardList(readingCardList):
+    output = [GrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
 
-class GrabbingCard:
-    def __intit__(self,lastWord):
-        self.grabbingWord = lastWord
-
+GRABBING_CARDS = generateGrabbingCardList(READING_CARDS)
