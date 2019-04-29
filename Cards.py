@@ -15,7 +15,7 @@ READING_CARDS = [
     ReadingCard("Justin", "Bieber"),
     ReadingCard("Abraham", "Lincoln"),
     ReadingCard("George", "Washington"),
-    ReadingCard("Space", "Needle"),
+    ReadingCard("Space", "Ship"),
     ReadingCard("Mount", "Rainier"),
     ReadingCard("Middle", "School"),
     ReadingCard("Great", "Wall"),
