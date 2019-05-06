@@ -2,13 +2,31 @@ class ReadingCard:
     def __init__(self, firstWord, lastWord):
         self.firstWord = firstWord
         self.lastWord = lastWord
+        self.index = -1
+
+    def setIndex(self, i):
+        self.index = i
+
+    def getFirstWord(self):
+        return self.firstWord
 
     def getLastWord(self):
         return self.lastWord
 
+    def getIndex(self):
+        return self.index
+
 class GrabbingCard:
     def __init__(self, lastWord):
         self.lastWord = lastWord
+        self.decisionWord = None
+        self.index = -1
+
+    def setDecisionWord(word):
+        self.decisionWord = word
+
+    def setIndex(self, i):
+        self.index = i
 
 READING_CARDS = [
     ReadingCard("Starbucks", "Coffee"),
@@ -120,3 +138,47 @@ def generateGrabbingCardList(readingCardList):
     ]
 
 GRABBING_CARDS = generateGrabbingCardList(READING_CARDS)
+
+def sortFirstWords(readingCardList):
+    firstWordList = []
+    for i in range(len(readingCardList)):
+        firstWordList.append(readingCardList[i].firstWord)
+    return sorted(firstWordList)
+
+#remark: for each i, lastWord of readingCardList at i is the same as that of grabbingCardList at i
+def assignIndices(readingCardList, grabbingCardList):
+    for i in range(len(readingCardList)):
+        readingCardList[i].setIndex(i + 1)
+        grabbingCardList[i].setIndex(i + 1)
+
+#return firstWord-to-grabbingCard Map
+#remark: for each i, lastWord of readingCardList at i is the same as that of grabbingCardList at i
+def assignGrabbingCards(readingCardList, grabbingCardList):
+    firstWordToGRabbingCardMap = {}
+    for i in range(len(readingCardList)):
+        firstWordToGRabbingCardMap[
+            readingCardList[i].getFirstWord()] = grabbingCardList[i]
+
+def assignDecisionWords(readingCardList, grabbingCardList,
+                        indexToGrabbingCardMap):
+    sortedFirstWords = sortFirstWords(readingCardList)
+    decisionWords = [[] for i in range(len(readingCardList))]
+    index = 0  # Word Index. Move back and forth according to checking letters
+    decisionIndex = 0  # Word Index. Increment when the decisionWord is obtained
+    letterIndex = 0  # Letter of the given word
+    decided = False
+    while (decisionIndex < len(readingCardList)):
+        letterIndex = len(decisionWords[decisionIndex])
+        while (not decided):
+            letter = sortedFirstWords[decisionIndex][letterIndex]
+            while ((index < len(readingCardList))
+                   and (sortedFirstWords[index][letterIndex] is letter)):
+                index += 1
+            if (index == decisionIndex + 1):
+                decided = True
+            for j in range(decisionIndex, index):
+                decisionWords[j].append(letter)
+            letterIndex += 1
+            index = decisionIndex
+        decided = False
+        decisionIndex += 1

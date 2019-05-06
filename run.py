@@ -6,5 +6,7 @@ else:
     exec (open("Cards.py").read())
 
 if __name__ == "__main__":
-    if (len(GRABBING_CARDS) > 1):
-        print(GRABBING_CARDS[1].lastWord)
+    firstWordList = sortFirstWords(READING_CARDS)
+
+    for i in range(len(firstWordList)):
+        print(firstWordList[i])
