@@ -22,7 +22,7 @@ class GrabbingCard:
         self.decisionWord = None
         self.index = -1
 
-    def setDecisionWord(word):
+    def setDecisionWord(self, word):
         self.decisionWord = word
 
     def setIndex(self, i):
@@ -43,10 +43,10 @@ READING_CARDS = [
     ReadingCard("Highlight", "Pen"),
     ReadingCard("Color", "Pencil"),
     ReadingCard("Index", "Card"),
-    ReadingCard("Star", "War"),
+    ReadingCard("Opium", "War"),
     ReadingCard("Charlie", "Chaplin"),
     ReadingCard("Chit", "Chat"),
-    ReadingCard("Child", "Care"),
+    ReadingCard("Day", "Care"),
     ReadingCard("Chocolate", "Bar"),
     ReadingCard("World", "Cup"),
     ReadingCard("Tokyo", "Olympic"),
@@ -154,10 +154,11 @@ def assignIndices(readingCardList, grabbingCardList):
 #return firstWord-to-grabbingCard Map
 #remark: for each i, lastWord of readingCardList at i is the same as that of grabbingCardList at i
 def assignGrabbingCards(readingCardList, grabbingCardList):
-    firstWordToGRabbingCardMap = {}
+    firstWordToGrabbingCardMap = {}
     for i in range(len(readingCardList)):
-        firstWordToGRabbingCardMap[
+        firstWordToGrabbingCardMap[
             readingCardList[i].getFirstWord()] = grabbingCardList[i]
+    return firstWordToGrabbingCardMap
 
 def assignDecisionWords(readingCardList, grabbingCardList,
                         indexToGrabbingCardMap):
@@ -169,16 +170,29 @@ def assignDecisionWords(readingCardList, grabbingCardList,
     decided = False
     while (decisionIndex < len(readingCardList)):
         letterIndex = len(decisionWords[decisionIndex])
-        while (not decided):
+        while ((not decided)
+               and (letterIndex < len(sortedFirstWords[decisionIndex]))):
             letter = sortedFirstWords[decisionIndex][letterIndex]
+            index = decisionIndex
             while ((index < len(readingCardList))
-                   and (sortedFirstWords[index][letterIndex] is letter)):
+                   and (letterIndex < len(sortedFirstWords[index]))):
+                if ((sortedFirstWords[index][letterIndex] is not letter)
+                        or (len(decisionWords[decisionIndex]) != len(
+                            decisionWords[index]))):
+                    break
                 index += 1
             if (index == decisionIndex + 1):
                 decided = True
             for j in range(decisionIndex, index):
                 decisionWords[j].append(letter)
             letterIndex += 1
-            index = decisionIndex
+
         decided = False
         decisionIndex += 1
+
+    for l in range(len(decisionWords)):
+        decisionWords[l] = "".join(decisionWords[l])
+
+    for k in range(len(sortedFirstWords)):
+        indexToGrabbingCardMap[sortedFirstWords[k]].setDecisionWord(
+            decisionWords[k])

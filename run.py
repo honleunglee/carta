@@ -8,5 +8,11 @@ else:
 if __name__ == "__main__":
     firstWordList = sortFirstWords(READING_CARDS)
 
+    firstWordToGrabbingCardMap = assignGrabbingCards(READING_CARDS,
+                                                     GRABBING_CARDS)
+    assignDecisionWords(READING_CARDS, GRABBING_CARDS,
+                        firstWordToGrabbingCardMap)
+
     for i in range(len(firstWordList)):
-        print(firstWordList[i])
+        print(firstWordList[i] + " " +
+              firstWordToGrabbingCardMap[firstWordList[i]].decisionWord)
