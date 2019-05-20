@@ -197,7 +197,7 @@ def assignDecisionWords(readingCardList, grabbingCardList,
         indexToGrabbingCardMap[sortedFirstWords[k]].setDecisionWord(
             decisionWords[k])
 
-def showList(grabbingCardList):
+def createDecWordLenList(grabbingCardList):
     decisionWordLengthDic = {}
     for i in range(len(grabbingCardList)):
         if len(grabbingCardList[i].decisionWord) in decisionWordLengthDic:
