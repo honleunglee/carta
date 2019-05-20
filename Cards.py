@@ -45,36 +45,36 @@ READING_CARDS = [
     ReadingCard("Index", "Card"),
     ReadingCard("Opium", "War"),
     ReadingCard("Charlie", "Chaplin"),
-    ReadingCard("Chit", "Chat"),
-    ReadingCard("Day", "Care"),
+    ReadingCard("Childhood", "Memory"),
+    ReadingCard("Dentist", "Appointment"),
     ReadingCard("Chocolate", "Bar"),
     ReadingCard("World", "Cup"),
-    ReadingCard("Tokyo", "Olympic"),
-    ReadingCard("Tool", "Box"),
+    ReadingCard("Yellow", "Fever"),
+    ReadingCard("Local", "News"),
     ReadingCard("Iron", "Man"),
     ReadingCard("King", "Arthur"),
     ReadingCard("Potato", "Chips"),
     ReadingCard("Mont", "Blanc"),
     ReadingCard("Himeji", "Castle"),
     ReadingCard("Pythagorean", "Theorem"),
-    ReadingCard("Tooth", "Brush"),
+    ReadingCard("Turkey", "Dinner"),
     ReadingCard("Computer", "Science"),
     ReadingCard("Big", "Bang"),
     ReadingCard("Black", "Panther"),
     ReadingCard("Internet", "Explorer"),
     ReadingCard("Google", "Search"),
-    ReadingCard("Marvel", "Movie"),
+    ReadingCard("Election", "Day"),
     ReadingCard("Captain", "America"),
     ReadingCard("California", "University"),
     ReadingCard("Merry", "Christmas"),
     ReadingCard("Happy", "Easter"),
     ReadingCard("Social", "Security"),
-    ReadingCard("Toilet", "Paper"),
+    ReadingCard("Musical", "Instruments"),
     ReadingCard("Native", "American"),
     ReadingCard("Bill", "Gates"),
     ReadingCard("Play", "Store"),
     ReadingCard("Apple", "Pay"),
-    ReadingCard("Mark", "Zuckerberg"),
+    ReadingCard("Microwave", "Oven"),
     ReadingCard("Steve", "Jobs"),
     ReadingCard("Microsoft", "Word"),
     ReadingCard("Samsung", "Galaxy"),
@@ -95,12 +95,12 @@ READING_CARDS = [
     ReadingCard("Nintendo", "Switch"),
     ReadingCard("William", "Shakespeare"),
     ReadingCard("Harry", "Potter"),
-    ReadingCard("Tomb", "Raider"),
+    ReadingCard("Weight", "Training"),
     ReadingCard("Logan", "Paul"),
     ReadingCard("Dragon", "Ball"),
     ReadingCard("Milk", "Tea"),
     ReadingCard("Video", "Game"),
-    ReadingCard("Universal", "Studio"),
+    ReadingCard("Zigzag", "Path"),
     ReadingCard("Jurassic", "Park"),
     ReadingCard("Barack", "Obama"),
     ReadingCard("Thunder", "Storm"),
@@ -108,10 +108,10 @@ READING_CARDS = [
     ReadingCard("Post", "Office"),
     ReadingCard("South", "Korea"),
     ReadingCard("Fire", "Truck"),
-    ReadingCard("Police", "Car"),
+    ReadingCard("Police", "Station"),
     ReadingCard("State", "Court"),
-    ReadingCard("Michael", "Bay"),
-    ReadingCard("Community", "Service"),
+    ReadingCard("Electric", "Car"),
+    ReadingCard("Compound", "Interest"),
     ReadingCard("Graphing", "Calculator"),
     ReadingCard("Pacific", "Ocean"),
     ReadingCard("Washing", "Machine"),
@@ -120,10 +120,10 @@ READING_CARDS = [
     ReadingCard("Red", "Bean"),
     ReadingCard("Ice", "Cream"),
     ReadingCard("Transit", "Center"),
-    ReadingCard("Train", "Station"),
+    ReadingCard("Treasure", "Island"),
     ReadingCard("Bus", "Stop"),
     ReadingCard("Cell", "Phone"),
-    ReadingCard("Portable", "Charger"),
+    ReadingCard("Protein", "Powder"),
     ReadingCard("Caesar", "Salid"),
     ReadingCard("Orange", "Juice"),
     ReadingCard("Disneyland", "Sea"),
@@ -196,3 +196,32 @@ def assignDecisionWords(readingCardList, grabbingCardList,
     for k in range(len(sortedFirstWords)):
         indexToGrabbingCardMap[sortedFirstWords[k]].setDecisionWord(
             decisionWords[k])
+
+def showList(grabbingCardList):
+    decisionWordLengthDic = {}
+    for i in range(len(grabbingCardList)):
+        if len(grabbingCardList[i].decisionWord) in decisionWordLengthDic:
+            decisionWordLengthDic[len(
+                grabbingCardList[i].decisionWord)] = decisionWordLengthDic[len(
+                    grabbingCardList[i].decisionWord)] + 1
+        else:
+            decisionWordLengthDic[len(grabbingCardList[i].decisionWord)] = 1
+    return decisionWordLengthDic
+
+def analyzeCards(readingCardList, grabbingCardList):
+    firstWordList = sortFirstWords(readingCardList)
+
+    firstWordToGrabbingCardMap = assignGrabbingCards(readingCardList,
+                                                     grabbingCardList)
+    assignDecisionWords(readingCardList, grabbingCardList,
+                        firstWordToGrabbingCardMap)
+    decisionWordLengthList = showList(grabbingCardList)
+
+    for i in range(len(firstWordList)):
+        if (len(firstWordToGrabbingCardMap[firstWordList[i]].decisionWord) >=
+                1):
+            print(firstWordList[i] + " " +
+                  firstWordToGrabbingCardMap[firstWordList[i]].decisionWord)
+
+    for i in decisionWordLengthList:
+        print(str(i) + " " + str(decisionWordLengthList[i]))
