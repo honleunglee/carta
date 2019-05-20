@@ -6,5 +6,4 @@ else:
     exec (open("Cards.py").read())
 
 if __name__ == "__main__":
-    if (len(GRABBING_CARDS) > 1):
-        print(GRABBING_CARDS[1].lastWord)
+    analyzeCards(READING_CARDS, GRABBING_CARDS)
