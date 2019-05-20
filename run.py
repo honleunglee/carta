@@ -1,11 +1,11 @@
 import sys
 
 if sys.version_info[0] < 3:
-    execfile("Cards.py")
-    execfile("CardStack.py")
+    execfile("Carta.py")
 else:
-    exec (open("Cards.py").read())
-    exec (open("CardStack.py").read())
+    exec (open("Carta.py").read())
 
 if __name__ == "__main__":
-    pass
+    c = Carta()
+    c.process()
+    c.quit()
