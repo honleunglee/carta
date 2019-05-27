@@ -215,8 +215,8 @@ def analyzeCards(readingCardList, grabbingCardList):
                                                      grabbingCardList)
     assignDecisionWords(readingCardList, grabbingCardList,
                         firstWordToGrabbingCardMap)
-    decisionWordLengthList = showList(grabbingCardList)
-
+    decisionWordLengthList = createDecWordLenList(grabbingCardList)
+    """
     for i in range(len(firstWordList)):
         if (len(firstWordToGrabbingCardMap[firstWordList[i]].decisionWord) >=
                 1):
@@ -225,3 +225,4 @@ def analyzeCards(readingCardList, grabbingCardList):
 
     for i in decisionWordLengthList:
         print(str(i) + " " + str(decisionWordLengthList[i]))
+    """
