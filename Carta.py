@@ -111,6 +111,9 @@ class Carta:
                        self.GUIParameters.numCardRows):
             self.setFramesInARow(stepX, start, self.frames)
 
+        self.occupied = [False for i in range(len(self.frames) // 2)]
+        self.cardToFrameMap = {}
+
     def createCardFrame(self, lt):
         rb = Point(lt.x + self.GUIParameters.cardWidth,
                    lt.y + self.GUIParameters.cardHeight)
@@ -121,14 +124,14 @@ class Carta:
         minDistanceSq = sys.float_info.max
         bestFrameIndex = self.GUIParameters.numFrames
         # for loop over your frames (not all frames)
-        # TODO(Chapman): Only consider unoccupied frames
         for i in range(self.GUIParameters.numFrames // 2,
                        self.GUIParameters.numFrames):
-            distSq = (self.frames[i][0][0] - pos.x)**2 + \
-                     (self.frames[i][0][1] - pos.y)**2
-            if (distSq < minDistanceSq):
-                minDistanceSq = distSq
-                bestFrameIndex = i
+            if not self.occupied[i - (self.GUIParameters.numFrames // 2)]:
+                distSq = (self.frames[i][0][0] - pos.x)**2 + \
+                         (self.frames[i][0][1] - pos.y)**2
+                if (distSq < minDistanceSq):
+                    minDistanceSq = distSq
+                    bestFrameIndex = i
         return bestFrameIndex
 
     def fillScreens(self):
@@ -167,6 +170,8 @@ class Carta:
                 offset.x = self.cards[dragIndex[0]].x - mouse.x
                 offset.y = self.cards[dragIndex[0]].y - mouse.y
                 self.cardColors[j] = self.colors.yellow
+                if j in self.cardToFrameMap:
+                    self.occupied[self.cardToFrameMap[j]] = False
                 break
 
     # The function updates dragIndex, mouse, offset
@@ -194,6 +199,10 @@ class Carta:
             self.cards[dragIndex[0]].y = self.frames[frameIndex][0][1]
             self.cardColors[dragIndex[0]] = self.colors.white
             self.cardDragging = False
+            cardIndex = dragIndex[0]
+            frameIndexOffset = frameIndex - (len(self.frames) // 2)
+            self.occupied[frameIndexOffset] = True
+            self.cardToFrameMap[cardIndex] = frameIndexOffset
 
         # Left click and drag the mouse
         elif ((event.type == pygame.MOUSEMOTION) and self.cardDragging):
