@@ -49,14 +49,25 @@ class GUIParameters:  # const parameters
 
 class Carta:
     def __init__(self):
-        pygame.init()
-
+        self.initGame()
         self.initRendering()
-        self.initGrabbingCards()
         self.initCardFrames()
+        self.initGrabbingCards()
 
         self.clock = pygame.time.Clock()
         self.running = True  # track if the game is running
+
+    def initGame(self):
+        pygame.init()
+        grabbingCardStack = CardStack(GRABBING_CARDS)
+        grabbingCardStack.shuffle()
+        halfStack = grabbingCardStack.draw(len(GRABBING_CARDS) // 2)
+        self.yourGrabbingCards = [
+            halfStack[i] for i in range(0, len(halfStack), 2)
+        ]
+        self.opponentGrabbingCards = [
+            halfStack[i] for i in range(1, len(halfStack), 2)
+        ]
 
     def initRendering(self):
         self.colors = Colors()
@@ -75,18 +86,10 @@ class Carta:
             self.GUIParameters.infoScreenStartX,
             self.GUIParameters.screenHeight)
 
-    def initGrabbingCards(self):
-        # To fix: should be 25 cards for you, 25 cards for opponent
-        self.lastWords = [card.lastWord for card in GRABBING_CARDS]
-        # grabbing cards as rectangles in screen
-        self.cards = [None] * len(self.lastWords)
-        self.cardColors = [self.colors.white] * len(self.lastWords)
-        for i in range(len(self.cards)):
-            self.cards[i] = pygame.rect.Rect(self.GUIParameters.stackStart.x,
-                                             self.GUIParameters.stackStart.y,
-                                             self.GUIParameters.cardWidth,
-                                             self.GUIParameters.cardHeight)
-        self.cardDragging = False
+    def createCardFrame(self, lt):
+        rb = Point(lt.x + self.GUIParameters.cardWidth,
+                   lt.y + self.GUIParameters.cardHeight)
+        return [(lt.x, lt.y), (lt.x, rb.y), (rb.x, rb.y), (rb.x, lt.y)]
 
     def setFramesInARow(self, stepX, start,
                         frames):  # start and frames will be modified
@@ -114,10 +117,37 @@ class Carta:
         self.occupied = [False for i in range(len(self.frames) // 2)]
         self.cardToFrameMap = {}
 
-    def createCardFrame(self, lt):
-        rb = Point(lt.x + self.GUIParameters.cardWidth,
-                   lt.y + self.GUIParameters.cardHeight)
-        return [(lt.x, lt.y), (lt.x, rb.y), (rb.x, rb.y), (rb.x, lt.y)]
+    def initGrabbingCards(self):
+        # First handle your grabbing cards, then opponents
+        self.lastWords = [card.lastWord for card in self.yourGrabbingCards]
+        self.lastWords += [
+            card.lastWord for card in self.opponentGrabbingCards
+        ]
+
+        # grabbing cards as rectangles in screen
+        # First half is yours, second half is opponent's
+        self.cards = [None] * len(self.lastWords)
+        self.cardColors = [self.colors.white] * len(self.lastWords)
+
+        # Your cards start at the card stack on the right of screen
+        for i in range(len(self.cards) // 2):
+            self.cards[i] = pygame.rect.Rect(self.GUIParameters.stackStart.x,
+                                             self.GUIParameters.stackStart.y,
+                                             self.GUIParameters.cardWidth,
+                                             self.GUIParameters.cardHeight)
+
+        # Opponent cards start at their designated positions
+        # For now, assume they line up in the opponent card frames
+        frameIndex = 0
+        for i in range(len(self.cards) // 2, len(self.cards)):
+            self.cards[i] = pygame.rect.Rect(self.frames[frameIndex][0][0],
+                                             self.frames[frameIndex][0][1],
+                                             self.GUIParameters.cardWidth,
+                                             self.GUIParameters.cardHeight)
+            frameIndex += 1
+
+        self.cardDragging = False
+        self.touchYourCard = False
 
     # pos is the position of left top corner of a card
     def findNearestFrame(self, pos):
@@ -148,16 +178,26 @@ class Carta:
                               self.frames[j],
                               self.GUIParameters.frameThickness)
 
-    def drawCardsAndWords(self):
+    def drawSingleCardAndWord(self, cardIndex):
+        pygame.draw.rect(self.screen, self.cardColors[cardIndex],
+                         self.cards[cardIndex])
+        textsurface = self.font.render(self.lastWords[cardIndex], False,
+                                       self.colors.black)
+        self.screen.blit(
+            textsurface,
+            (self.cards[cardIndex].x + self.GUIParameters.leftCardMargin,
+             self.cards[cardIndex].y + self.GUIParameters.topCardMargin))
+
+    def drawCardsAndWords(self, dragIndex):
         # Draw cards and write last words on the cards
-        for i in range(len(self.cards)):
-            pygame.draw.rect(self.screen, self.cardColors[i], self.cards[i])
-            textsurface = self.font.render(self.lastWords[i], False,
-                                           self.colors.black)
-            self.screen.blit(
-                textsurface,
-                (self.cards[i].x + self.GUIParameters.leftCardMargin,
-                 self.cards[i].y + self.GUIParameters.topCardMargin))
+        # First draw the non-dragging cards
+        for i in range(len(self.cards) - 1, -1, -1):
+            if (i is not dragIndex):
+                self.drawSingleCardAndWord(i)
+
+        # Draw the dragging card, to make sure it is always
+        # rendered on top
+        self.drawSingleCardAndWord(dragIndex)
 
     # The function updates dragIndex, mouse, offset
     def selectCard(self, event, dragIndex, mouse, offset):
@@ -165,6 +205,7 @@ class Carta:
             # If mouse click is on self.cards[j]
             if self.cards[j].collidepoint(event.pos):
                 self.cardDragging = True
+                self.touchYourCard = (j < len(self.cards) // 2)
                 mouse.x, mouse.y = event.pos
                 dragIndex[0] = j
                 offset.x = self.cards[dragIndex[0]].x - mouse.x
@@ -192,20 +233,25 @@ class Carta:
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
               (event.button == 1) and \
                self.cardDragging):
-            frameIndex = self.findNearestFrame(
-                Point(self.cards[dragIndex[0]].x, self.cards[dragIndex[0]].y))
+            if (self.touchYourCard):
+                frameIndex = self.findNearestFrame(
+                    Point(self.cards[dragIndex[0]].x,
+                          self.cards[dragIndex[0]].y))
+                self.cards[dragIndex[0]].x = self.frames[frameIndex][0][0]
+                self.cards[dragIndex[0]].y = self.frames[frameIndex][0][1]
+                cardIndex = dragIndex[0]
+                frameIndexOffset = frameIndex - (len(self.frames) // 2)
+                self.occupied[frameIndexOffset] = True
+                self.cardToFrameMap[cardIndex] = frameIndexOffset
 
-            self.cards[dragIndex[0]].x = self.frames[frameIndex][0][0]
-            self.cards[dragIndex[0]].y = self.frames[frameIndex][0][1]
             self.cardColors[dragIndex[0]] = self.colors.white
             self.cardDragging = False
-            cardIndex = dragIndex[0]
-            frameIndexOffset = frameIndex - (len(self.frames) // 2)
-            self.occupied[frameIndexOffset] = True
-            self.cardToFrameMap[cardIndex] = frameIndexOffset
+            self.touchYourCard = False
 
-        # Left click and drag the mouse
-        elif ((event.type == pygame.MOUSEMOTION) and self.cardDragging):
+        # Left click and drag your card
+        elif ((event.type == pygame.MOUSEMOTION) and \
+           self.cardDragging and \
+           self.touchYourCard):
             mouse.x, mouse.y = event.pos
             self.cards[dragIndex[0]].x = mouse.x + offset.x
             self.cards[dragIndex[0]].y = mouse.y + offset.y
@@ -223,7 +269,7 @@ class Carta:
             # Rendering
             self.fillScreens()
             self.drawCardFrames()
-            self.drawCardsAndWords()
+            self.drawCardsAndWords(dragIndex[0])
 
             pygame.display.flip()  # update drawing contents
             self.clock.tick(self.GUIParameters.FPS)
