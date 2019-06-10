@@ -28,6 +28,9 @@ class GrabbingCard:
     def setIndex(self, i):
         self.index = i
 
+    def getLastWord(self):
+        return self.lastWord
+
 READING_CARDS = [
     ReadingCard("Starbucks", "Coffee"),
     ReadingCard("Justin", "Bieber"),

@@ -54,6 +54,17 @@ class GUIParameters:  # const parameters
         self.leftCardMargin = 5  # for last word in a grabbing card
         self.topCardMargin = 5  # for last word in a grabbing card
 
+# Carta Game Phase enum (in python 3, import enum as Enum)
+# Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
+class Phase:
+    INVALID = 0  # none of the states below
+    OPPONENT_SET_UP = 1  # opoonent setting his/her cards in his/her field
+    YOUR_SET_UP = 2  # you setting your cards in your field
+    GRABBING = 3  # grabbing: compete between you and opponent
+    OPPONENT_ADJUSTMENT = 4  # opponent may give a card to you
+    YOUR_ADJUSTMENT = 5  # you may give a card to opponent
+    END_GAME = 6
+
 class Carta:
     def __init__(self):
         self.initGame()
@@ -76,6 +87,7 @@ class Carta:
         self.opponentGrabbingCards = [
             halfStack[i] for i in range(1, len(halfStack), 2)
         ]
+        self.phase = Phase.YOUR_SET_UP  # temporary, AI needs set up later
 
     def initRendering(self):
         self.colors = Colors()
@@ -85,8 +97,10 @@ class Carta:
         pygame.display.set_caption("Carta")
 
         pygame.font.init()
+        # for grabbing card word
         self.font = pygame.font.SysFont('freesans',
                                         self.GUIParameters.fontSize)
+        # for reading card word
         self.wordFont = pygame.font.SysFont('freesans',
                                             self.GUIParameters.wordFontSize)
 
@@ -100,7 +114,7 @@ class Carta:
         # Shuffle and put 50 cards into the readingCardStack
         readingCardStack = CardStack(READING_CARDS)
         readingCardStack.shuffle()
-        self.readingCards = readingCardStack.draw(50)
+        self.readingCards = readingCardStack.draw(len(READING_CARDS) // 2)
         self.readingCardBox = pygame.rect.Rect(
             self.GUIParameters.wordBoxStart.x,
             self.GUIParameters.wordBoxStart.y, self.GUIParameters.wordBoxWidth,
@@ -139,9 +153,11 @@ class Carta:
 
     def initGrabbingCards(self):
         # First handle your grabbing cards, then opponents
-        self.lastWords = [card.lastWord for card in self.yourGrabbingCards]
+        self.lastWords = [
+            card.getLastWord() for card in self.yourGrabbingCards
+        ]
         self.lastWords += [
-            card.lastWord for card in self.opponentGrabbingCards
+            card.getLastWord() for card in self.opponentGrabbingCards
         ]
 
         # grabbing cards as rectangles in screen
@@ -188,7 +204,7 @@ class Carta:
         self.screen.fill(self.colors.lightGreen)
         pygame.draw.rect(self.screen, self.colors.lightBlue, self.infoScreen)
 
-    def drawCardFrames(self):
+    def renderCardFrames(self):
         for j in range(len(self.frames) // 2):
             pygame.draw.lines(self.screen, self.colors.red, True,
                               self.frames[j],
@@ -198,7 +214,7 @@ class Carta:
                               self.frames[j],
                               self.GUIParameters.frameThickness)
 
-    def drawSingleCardAndWord(self, cardIndex):
+    def renderSingleCardAndWord(self, cardIndex):
         pygame.draw.rect(self.screen, self.cardColors[cardIndex],
                          self.cards[cardIndex])
         textsurface = self.font.render(self.lastWords[cardIndex], False,
@@ -208,19 +224,19 @@ class Carta:
             (self.cards[cardIndex].x + self.GUIParameters.leftCardMargin,
              self.cards[cardIndex].y + self.GUIParameters.topCardMargin))
 
-    def drawCardsAndWords(self, dragIndex):
-        # Draw cards and write last words on the cards
-        # First draw the non-dragging cards
+    def renderGrabbingCardsAndWords(self, dragIndex):
+        # Render cards and write last words on the cards
+        # First render the non-dragging cards
         for i in range(len(self.cards) - 1, -1, -1):
             if (i is not dragIndex):
-                self.drawSingleCardAndWord(i)
+                self.renderSingleCardAndWord(i)
 
-        # Draw the dragging card, to make sure it is always
+        # Render the dragging card, to make sure it is always
         # rendered on top
-        self.drawSingleCardAndWord(dragIndex)
+        self.renderSingleCardAndWord(dragIndex)
 
-    def drawFirstAndLastWords(self):
-        # Draw First and Last Words on Empty Space
+    def renderReadingCardWords(self):
+        # Render first and last words on empty space on the right of screen
         for i in range(len(self.readingCards)):
             pygame.draw.rect(self.screen, self.colors.black,
                              self.readingCardBox)
@@ -249,6 +265,11 @@ class Carta:
                     self.occupied[self.cardToFrameMap[j]] = False
                 break
 
+    def pressDoneButton(self):
+        pass
+        # if self.doneButton.collidepoint(event.pos) and self.phase is Phase.YOUR_SET_UP:
+        #     self.phase = Phase.GRABBING
+
     # The function updates dragIndex, mouse, offset
     def handleEvent(self, event, dragIndex, mouse, offset):
         if event.type == pygame.QUIT:  # Click the X in the window
@@ -263,7 +284,9 @@ class Carta:
         elif ((event.type == pygame.MOUSEBUTTONDOWN) and \
               (event.button == 1)):
             self.selectCard(event, dragIndex, mouse, offset)
+            self.pressDoneButton()
 
+        # The below only works in your set up phase
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
               (event.button == 1) and \
                self.cardDragging):
@@ -302,11 +325,12 @@ class Carta:
 
             # Rendering
             self.fillScreens()
-            self.drawCardFrames()
-            self.drawCardsAndWords(dragIndex[0])
-            self.drawFirstAndLastWords()
+            self.renderCardFrames()
+            self.renderGrabbingCardsAndWords(dragIndex[0])
+            if (self.phase is Phase.GRABBING):
+                self.renderReadingCardWords()
 
-            pygame.display.flip()  # update drawing contents
+            pygame.display.flip()  # update rendering contents
             self.clock.tick(self.GUIParameters.FPS)
 
     def quit(self):
