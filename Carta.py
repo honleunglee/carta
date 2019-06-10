@@ -32,16 +32,23 @@ class GUIParameters:  # const parameters
         self.FPS = 30  # upper bound per frames per second
         self.cardWidth = 52
         self.cardHeight = 73
+        self.wordBoxWidth = 270  # Width for wordBox from reading card
+        self.wordBoxHeight = 200  # Height for wordBox from reading card
         self.numFrames = 72  # card frames (number of frames per row * self.numCardRows)
         self.frameThickness = 3
         self.horizontalSpacing = 1  # between two frames
         self.verticalSpacing = 10  # between two rows of frames
         self.extraVerticalSpacing = self.verticalSpacing * 2
         self.fontSize = 18
+        self.wordFontSize = 36  # for reading card word font size
         self.numCardRows = 6
         self.leftMargin = 20  # for grabbing cards in the screen
         self.topMargin = 20  # for grabbing cards in the screen
+        self.wordLeftMargin = 10  # Reading card word in the wordBox
+        self.wordTopMargin = 85  # Reading card word in the wordBox
         self.infoScreenStartX = self.screenWidth * 7 // 10
+        self.wordBoxStart = Point(
+            720, 100)  # left top for wordBox from reading word
         self.stackStart = Point(
             750, 400)  # left top point for stack of grabbing cards
         self.leftCardMargin = 5  # for last word in a grabbing card
@@ -51,6 +58,7 @@ class Carta:
     def __init__(self):
         self.initGame()
         self.initRendering()
+        self.initReadingCards()
         self.initCardFrames()
         self.initGrabbingCards()
 
@@ -79,12 +87,24 @@ class Carta:
         pygame.font.init()
         self.font = pygame.font.SysFont('freesans',
                                         self.GUIParameters.fontSize)
+        self.wordFont = pygame.font.SysFont('freesans',
+                                            self.GUIParameters.wordFontSize)
 
         self.infoScreen = pygame.rect.Rect(
             self.GUIParameters.infoScreenStartX, 0,
             self.GUIParameters.screenWidth -
             self.GUIParameters.infoScreenStartX,
             self.GUIParameters.screenHeight)
+
+    def initReadingCards(self):
+        # Shuffle and put 50 cards into the readingCardStack
+        readingCardStack = CardStack(READING_CARDS)
+        readingCardStack.shuffle()
+        self.readingCards = readingCardStack.draw(50)
+        self.readingCardBox = pygame.rect.Rect(
+            self.GUIParameters.wordBoxStart.x,
+            self.GUIParameters.wordBoxStart.y, self.GUIParameters.wordBoxWidth,
+            self.GUIParameters.wordBoxHeight)
 
     def createCardFrame(self, lt):
         rb = Point(lt.x + self.GUIParameters.cardWidth,
@@ -199,6 +219,20 @@ class Carta:
         # rendered on top
         self.drawSingleCardAndWord(dragIndex)
 
+    def drawFirstAndLastWords(self):
+        # Draw First and Last Words on Empty Space
+        for i in range(len(self.readingCards)):
+            pygame.draw.rect(self.screen, self.colors.black,
+                             self.readingCardBox)
+            textsurface = self.wordFont.render(
+                (self.readingCards[i].getFirstWord() + " " +
+                 self.readingCards[i].getLastWord()), False, self.colors.white)
+
+            self.screen.blit(
+                textsurface,
+                (self.readingCardBox.x + self.GUIParameters.wordLeftMargin,
+                 self.readingCardBox.y + self.GUIParameters.wordTopMargin))
+
     # The function updates dragIndex, mouse, offset
     def selectCard(self, event, dragIndex, mouse, offset):
         for j in range(len(self.cards)):
@@ -270,6 +304,7 @@ class Carta:
             self.fillScreens()
             self.drawCardFrames()
             self.drawCardsAndWords(dragIndex[0])
+            self.drawFirstAndLastWords()
 
             pygame.display.flip()  # update drawing contents
             self.clock.tick(self.GUIParameters.FPS)
