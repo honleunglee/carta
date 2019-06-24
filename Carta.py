@@ -60,6 +60,8 @@ class GUIParameters:  # const parameters
         self.buttonBoxHeight = 40  # Height for "Done" button box
         self.leftDoneMargin = 10  # for "Done" button in the button box
         self.topDoneMargin = 10  # for "Done" button in the button box
+        self.leftTimeMargin = 5  # for time in info screen
+        self.topTimeMargin = 5  # for time in info screen
 
 # Carta Game Phase enum (in python 3, import enum as Enum)
 # Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
@@ -67,9 +69,10 @@ class Phase:
     INVALID = 0  # none of the states below
     OPPONENT_SET_UP = 1  # opoonent setting his/her cards in his/her field
     YOUR_SET_UP = 2  # you setting your cards in your field
-    GRABBING = 3  # grabbing: compete between you and opponent
-    OPPONENT_ADJUSTMENT = 4  # opponent may give a card to you
-    YOUR_ADJUSTMENT = 5  # you may give a card to opponent
+    DRAWING = 3  # draw a reading card
+    GRABBING = 4  # grabbing: compete between you and opponent
+    OPPONENT_ADJUSTMENT = 5  # opponent may give a card to you
+    YOUR_ADJUSTMENT = 6  # you may give a card to opponent
     END_GAME = 6
 
 class Carta:
@@ -85,16 +88,9 @@ class Carta:
 
     def initGame(self):
         pygame.init()
-        grabbingCardStack = CardStack(GRABBING_CARDS)
-        grabbingCardStack.shuffle()
-        halfStack = grabbingCardStack.draw(len(GRABBING_CARDS) // 2)
-        self.yourGrabbingCards = [
-            halfStack[i] for i in range(0, len(halfStack), 2)
-        ]
-        self.opponentGrabbingCards = [
-            halfStack[i] for i in range(1, len(halfStack), 2)
-        ]
-        self.phase = Phase.YOUR_SET_UP  # temporary, AI needs set up later
+        self.phase = Phase.OPPONENT_SET_UP
+        self.usedGrabbingCards = CardStack([])  # grabbed grabbing card
+        self.usedReadingCards = CardStack([])  # read reading card
 
     def initRendering(self):
         self.colors = Colors()
@@ -135,6 +131,8 @@ class Carta:
             self.GUIParameters.wordBoxStart.y, self.GUIParameters.wordBoxWidth,
             self.GUIParameters.wordBoxHeight)
 
+        self.currentReadingCard = None
+
     def createCardFrame(self, lt):
         rb = Point(lt.x + self.GUIParameters.cardWidth,
                    lt.y + self.GUIParameters.cardHeight)
@@ -163,11 +161,22 @@ class Carta:
                        self.GUIParameters.numCardRows):
             self.setFramesInARow(stepX, start, self.frames)
 
+        # only consider your frames
         self.occupied = [False for i in range(len(self.frames) // 2)]
-        self.cardToFrameMap = {}
+        self.cardToFrameMap = {}  # both your and opponent cards and frames
         self.numYourFramesOccupied = 0
 
     def initGrabbingCards(self):
+        grabbingCardStack = CardStack(GRABBING_CARDS)
+        grabbingCardStack.shuffle()
+        halfStack = grabbingCardStack.draw(len(GRABBING_CARDS) // 2)
+        self.yourGrabbingCards = [
+            halfStack[i] for i in range(0, len(halfStack), 2)
+        ]
+        self.opponentGrabbingCards = [
+            halfStack[i] for i in range(1, len(halfStack), 2)
+        ]
+
         # First handle your grabbing cards, then opponents
         self.lastWords = [
             card.getLastWord() for card in self.yourGrabbingCards
@@ -188,18 +197,32 @@ class Carta:
                                              self.GUIParameters.cardWidth,
                                              self.GUIParameters.cardHeight)
 
-        # Opponent cards start at their designated positions
-        # For now, assume they line up in the opponent card frames
-        frameIndex = 0
-        for i in range(len(self.cards) // 2, len(self.cards)):
-            self.cards[i] = pygame.rect.Rect(self.frames[frameIndex][0][0],
-                                             self.frames[frameIndex][0][1],
-                                             self.GUIParameters.cardWidth,
-                                             self.GUIParameters.cardHeight)
-            frameIndex += 1
+        if (self.phase == Phase.OPPONENT_SET_UP):
+            # Opponent cards start at their designated positions
+            # For now, assume they are randomly placed
+            frameIndexList = [k for k in range(0, len(self.frames) // 2)]
+            # sample (len(self.cards) // 2) indices from (len(self.frames) // 2) frames
+            random.seed(time.time())
+            sampledFrames = random.sample(frameIndexList, len(self.cards) // 2)
+
+            for i in range(len(self.cards) // 2, len(self.cards)):
+                frameIndex = sampledFrames[i - (len(self.cards) // 2)]
+                self.cards[i] = pygame.rect.Rect(self.frames[frameIndex][0][0],
+                                                 self.frames[frameIndex][0][1],
+                                                 self.GUIParameters.cardWidth,
+                                                 self.GUIParameters.cardHeight)
+            self.phase = Phase.YOUR_SET_UP
 
         self.cardDragging = False
         self.touchYourCard = False
+
+    # 0 ms --> pygame.init(). Get current time relative to pygame.init().
+    def getTime_ms(self):
+        return pygame.time.get_ticks()
+
+    # return integer time
+    def getIntTime_s(self):
+        return int(round(self.getTime_ms() / 1000))
 
     # pos is the position of left top corner of a card
     def findNearestFrame(self, pos):
@@ -220,6 +243,15 @@ class Carta:
         self.screen.fill(self.colors.lightGreen)
         pygame.draw.rect(self.screen, self.colors.lightBlue, self.infoScreen)
 
+    def renderTime(self):
+        timeString = str(self.getIntTime_s())  # in seconds
+        timeSurface = self.wordFont.render(timeString, False,
+                                           self.colors.black)
+        self.screen.blit(
+            timeSurface,
+            (self.infoScreen.x + self.GUIParameters.leftTimeMargin,
+             self.infoScreen.y + self.GUIParameters.topTimeMargin))
+
     def renderCardFrames(self):
         for j in range(len(self.frames) // 2):
             pygame.draw.lines(self.screen, self.colors.red, True,
@@ -231,10 +263,15 @@ class Carta:
                               self.GUIParameters.frameThickness)
 
     def renderSingleCardAndWord(self, cardIndex):
+        # self.cards and self.lastWords share the same indexing
         pygame.draw.rect(self.screen, self.cardColors[cardIndex],
                          self.cards[cardIndex])
         textsurface = self.font.render(self.lastWords[cardIndex], False,
                                        self.colors.black)
+
+        if (cardIndex >= len(self.cards) // 2):  # card is on opponent field
+            textsurface = pygame.transform.rotate(textsurface, 180)
+
         self.screen.blit(
             textsurface,
             (self.cards[cardIndex].x + self.GUIParameters.leftCardMargin,
@@ -254,12 +291,13 @@ class Carta:
     def renderReadingCardWords(self):
         # Render first and last words on empty space on the right of screen
         pygame.draw.rect(self.screen, self.colors.black, self.readingCardBox)
-        if (self.phase == Phase.GRABBING):
-            readingCard = self.readingCardStack.drawOneCard()
-            if (readingCard is not None):
+        # TODO: Why if (phase == GRABBING) does not work here?
+        if ((self.phase == Phase.DRAWING) or (self.phase == Phase.GRABBING)):
+            if (self.currentReadingCard is not None):
                 textsurface = self.wordFont.render(
-                    (readingCard.getFirstWord() + " " +
-                     readingCard.getLastWord()), False, self.colors.white)
+                    (self.currentReadingCard.getFirstWord() + " " +
+                     self.currentReadingCard.getLastWord()), False,
+                    self.colors.white)
 
                 self.screen.blit(
                     textsurface,
@@ -279,7 +317,7 @@ class Carta:
         for j in range(len(self.cards)):
             # If mouse click is on self.cards[j]
             if self.cards[j].collidepoint(event.pos):
-                self.cardDragging = True
+                self.cardDragging = (self.phase == Phase.YOUR_SET_UP)
                 self.touchYourCard = (j < len(self.cards) // 2)
                 mouse.x, mouse.y = event.pos
                 dragIndex[0] = j
@@ -287,7 +325,8 @@ class Carta:
                 offset.y = self.cards[dragIndex[0]].y - mouse.y
                 self.cardColors[j] = self.colors.yellow
                 if j in self.cardToFrameMap:
-                    self.occupied[self.cardToFrameMap[j]] = False
+                    self.occupied[self.cardToFrameMap[j] -
+                                  (len(self.frames) // 2)] = False
                     self.numYourFramesOccupied -= 1
                 break
 
@@ -297,7 +336,13 @@ class Carta:
         if ((self.doneButton.collidepoint(event.pos)) and \
             (self.phase == Phase.YOUR_SET_UP) and \
             (self.numYourFramesOccupied == (len(self.cards) // 2))):
-            self.phase = Phase.GRABBING
+            self.phase = Phase.DRAWING
+
+    # Draw a reading card
+    def drawReadingCard(self):
+        if (self.phase == Phase.DRAWING):
+            self.currentReadingCard = self.readingCardStack.drawOneCard()
+            self.phase == Phase.GRABBING
 
     # The function updates dragIndex, mouse, offset
     def handleEvent(self, event, dragIndex, mouse, offset):
@@ -313,13 +358,16 @@ class Carta:
         elif ((event.type == pygame.MOUSEBUTTONDOWN) and \
               (event.button == 1)):
             self.selectCard(event, dragIndex, mouse, offset)
-            self.pressDoneButton(event, mouse)
+            # TODO Why need this if?
+            if (self.phase == Phase.YOUR_SET_UP):
+                self.pressDoneButton(event, mouse)
+                self.drawReadingCard()
 
         # The below only works in your set up phase
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
-              (event.button == 1) and \
-               self.cardDragging):
-            if (self.touchYourCard):
+              (event.button == 1)):
+            self.cardColors[dragIndex[0]] = self.colors.white
+            if (self.cardDragging and self.touchYourCard):
                 frameIndex = self.findNearestFrame(
                     Point(self.cards[dragIndex[0]].x,
                           self.cards[dragIndex[0]].y))
@@ -329,11 +377,10 @@ class Carta:
                 frameIndexOffset = frameIndex - (len(self.frames) // 2)
                 self.occupied[frameIndexOffset] = True
                 self.numYourFramesOccupied += 1
-                self.cardToFrameMap[cardIndex] = frameIndexOffset
+                self.cardToFrameMap[cardIndex] = frameIndex
 
-            self.cardColors[dragIndex[0]] = self.colors.white
-            self.cardDragging = False
-            self.touchYourCard = False
+                self.cardDragging = False
+                self.touchYourCard = False
 
         # Left click and drag your card
         elif ((event.type == pygame.MOUSEMOTION) and \
@@ -355,11 +402,14 @@ class Carta:
 
             # Rendering
             self.fillScreens()
+            self.renderTime()
             self.renderCardFrames()
             if (self.phase is Phase.YOUR_SET_UP):
                 self.renderDoneButton()
             self.renderGrabbingCardsAndWords(dragIndex[0])
-            if (self.phase is Phase.GRABBING):
+            # TODO: Why if (phase == GRABBING) does not work here?
+            if ((self.phase is Phase.DRAWING)
+                    or (self.phase is Phase.GRABBING)):
                 self.renderReadingCardWords()
 
             pygame.display.flip()  # update rendering contents
