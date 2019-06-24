@@ -41,6 +41,7 @@ class GUIParameters:  # const parameters
         self.extraVerticalSpacing = self.verticalSpacing * 2
         self.fontSize = 18
         self.wordFontSize = 36  # for reading card word font size
+        self.buttonFontSize = 24
         self.numCardRows = 6
         self.leftMargin = 20  # for grabbing cards in the screen
         self.topMargin = 20  # for grabbing cards in the screen
@@ -53,6 +54,12 @@ class GUIParameters:  # const parameters
             750, 400)  # left top point for stack of grabbing cards
         self.leftCardMargin = 5  # for last word in a grabbing card
         self.topCardMargin = 5  # for last word in a grabbing card
+        self.doneButtonStart = Point(816,
+                                     300)  # left top for "Done" button box
+        self.buttonBoxWidth = 70  # Width for "Done" button box
+        self.buttonBoxHeight = 40  # Height for "Done" button box
+        self.leftDoneMargin = 10  # for "Done" button in the button box
+        self.topDoneMargin = 10  # for "Done" button in the button box
 
 # Carta Game Phase enum (in python 3, import enum as Enum)
 # Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
@@ -103,6 +110,9 @@ class Carta:
         # for reading card word
         self.wordFont = pygame.font.SysFont('freesans',
                                             self.GUIParameters.wordFontSize)
+        # for "Done" button word
+        self.doneFont = pygame.font.SysFont('freesand',
+                                            self.GUIParameters.buttonFontSize)
 
         self.infoScreen = pygame.rect.Rect(
             self.GUIParameters.infoScreenStartX, 0,
@@ -110,11 +120,16 @@ class Carta:
             self.GUIParameters.infoScreenStartX,
             self.GUIParameters.screenHeight)
 
+        self.doneButton = pygame.rect.Rect(
+            self.GUIParameters.doneButtonStart.x,
+            self.GUIParameters.doneButtonStart.y,
+            self.GUIParameters.buttonBoxWidth,
+            self.GUIParameters.buttonBoxHeight)
+
     def initReadingCards(self):
         # Shuffle and put 50 cards into the readingCardStack
-        readingCardStack = CardStack(READING_CARDS)
-        readingCardStack.shuffle()
-        self.readingCards = readingCardStack.draw(len(READING_CARDS) // 2)
+        self.readingCardStack = CardStack(READING_CARDS)
+        self.readingCardStack.shuffle()
         self.readingCardBox = pygame.rect.Rect(
             self.GUIParameters.wordBoxStart.x,
             self.GUIParameters.wordBoxStart.y, self.GUIParameters.wordBoxWidth,
@@ -150,6 +165,7 @@ class Carta:
 
         self.occupied = [False for i in range(len(self.frames) // 2)]
         self.cardToFrameMap = {}
+        self.numYourFramesOccupied = 0
 
     def initGrabbingCards(self):
         # First handle your grabbing cards, then opponents
@@ -237,17 +253,26 @@ class Carta:
 
     def renderReadingCardWords(self):
         # Render first and last words on empty space on the right of screen
-        for i in range(len(self.readingCards)):
-            pygame.draw.rect(self.screen, self.colors.black,
-                             self.readingCardBox)
-            textsurface = self.wordFont.render(
-                (self.readingCards[i].getFirstWord() + " " +
-                 self.readingCards[i].getLastWord()), False, self.colors.white)
+        pygame.draw.rect(self.screen, self.colors.black, self.readingCardBox)
+        if (self.phase == Phase.GRABBING):
+            readingCard = self.readingCardStack.drawOneCard()
+            if (readingCard is not None):
+                textsurface = self.wordFont.render(
+                    (readingCard.getFirstWord() + " " +
+                     readingCard.getLastWord()), False, self.colors.white)
 
-            self.screen.blit(
-                textsurface,
-                (self.readingCardBox.x + self.GUIParameters.wordLeftMargin,
-                 self.readingCardBox.y + self.GUIParameters.wordTopMargin))
+                self.screen.blit(
+                    textsurface,
+                    (self.readingCardBox.x + self.GUIParameters.wordLeftMargin,
+                     self.readingCardBox.y + self.GUIParameters.wordTopMargin))
+
+    def renderDoneButton(self):
+        pygame.draw.rect(self.screen, self.colors.red, self.doneButton)
+        textsurface = self.doneFont.render("Done", False, self.colors.black)
+        self.screen.blit(
+            textsurface,
+            (self.doneButton.x + self.GUIParameters.leftDoneMargin,
+             self.doneButton.y + self.GUIParameters.topDoneMargin))
 
     # The function updates dragIndex, mouse, offset
     def selectCard(self, event, dragIndex, mouse, offset):
@@ -263,12 +288,16 @@ class Carta:
                 self.cardColors[j] = self.colors.yellow
                 if j in self.cardToFrameMap:
                     self.occupied[self.cardToFrameMap[j]] = False
+                    self.numYourFramesOccupied -= 1
                 break
 
-    def pressDoneButton(self):
-        pass
-        # if self.doneButton.collidepoint(event.pos) and self.phase is Phase.YOUR_SET_UP:
-        #     self.phase = Phase.GRABBING
+    # The function updates mouse and phase
+    def pressDoneButton(self, event, mouse):
+        # if the "Done" button was pushed while it is my setup phase, then move onto grabbing phase
+        if ((self.doneButton.collidepoint(event.pos)) and \
+            (self.phase == Phase.YOUR_SET_UP) and \
+            (self.numYourFramesOccupied == 3)): #(len(self.cards) // 2))):
+            self.phase = Phase.GRABBING
 
     # The function updates dragIndex, mouse, offset
     def handleEvent(self, event, dragIndex, mouse, offset):
@@ -284,7 +313,7 @@ class Carta:
         elif ((event.type == pygame.MOUSEBUTTONDOWN) and \
               (event.button == 1)):
             self.selectCard(event, dragIndex, mouse, offset)
-            self.pressDoneButton()
+            self.pressDoneButton(event, mouse)
 
         # The below only works in your set up phase
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
@@ -299,6 +328,7 @@ class Carta:
                 cardIndex = dragIndex[0]
                 frameIndexOffset = frameIndex - (len(self.frames) // 2)
                 self.occupied[frameIndexOffset] = True
+                self.numYourFramesOccupied += 1
                 self.cardToFrameMap[cardIndex] = frameIndexOffset
 
             self.cardColors[dragIndex[0]] = self.colors.white
@@ -326,6 +356,8 @@ class Carta:
             # Rendering
             self.fillScreens()
             self.renderCardFrames()
+            if (self.phase is Phase.YOUR_SET_UP):
+                self.renderDoneButton()
             self.renderGrabbingCardsAndWords(dragIndex[0])
             if (self.phase is Phase.GRABBING):
                 self.renderReadingCardWords()
