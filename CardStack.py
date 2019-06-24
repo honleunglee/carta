@@ -14,3 +14,9 @@ class CardStack:
 
     def draw(self, numCards):
         return [self.cards.pop(0) for i in range(numCards)]
+
+    def drawOneCard(self):
+        output = None
+        if (len(self.cards) > 0):
+            output = self.cards.pop(0)
+        return output
