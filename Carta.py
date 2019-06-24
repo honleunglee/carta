@@ -296,7 +296,7 @@ class Carta:
         # if the "Done" button was pushed while it is my setup phase, then move onto grabbing phase
         if ((self.doneButton.collidepoint(event.pos)) and \
             (self.phase == Phase.YOUR_SET_UP) and \
-            (self.numYourFramesOccupied == 3)): #(len(self.cards) // 2))):
+            (self.numYourFramesOccupied == (len(self.cards) // 2))):
             self.phase = Phase.GRABBING
 
     # The function updates dragIndex, mouse, offset
