@@ -20,3 +20,6 @@ class CardStack:
         if (len(self.cards) > 0):
             output = self.cards.pop(0)
         return output
+
+    def add(self, card):
+        self.cards.insert(0, card)
