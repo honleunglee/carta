@@ -75,6 +75,22 @@ class Phase:
     YOUR_ADJUSTMENT = 6  # you may give a card to opponent
     END_GAME = 6
 
+class CartaInfo:
+    def __init__(self):
+        self.startTime = 0  # time of the grabbing phase's start
+        self.yourGrabbingCard = None
+        self.yourTime = None  # time of pressing the grabbing card
+        self.opponentGrabbingCard = None
+        self.opponentTime = None  # time of opponent pressing the grabbing card
+        self.youWin = False
+        self.opponentMoved = False
+
+class CartaParameters:  # constant parameters
+    def __init__(self):
+        self.opponentTimeForStupidAI = 10000
+        self.maxGrabbingTime = 18000
+        self.opponentSuccessProb = 0.8
+
 class Carta:
     def __init__(self):
         self.initGame()
@@ -88,6 +104,8 @@ class Carta:
 
     def initGame(self):
         pygame.init()
+        self.info = CartaInfo()
+        self.parameters = CartaParameters()
         self.phase = Phase.OPPONENT_SET_UP
         self.usedGrabbingCards = CardStack([])  # grabbed grabbing card
         self.usedReadingCards = CardStack([])  # read reading card
@@ -176,6 +194,7 @@ class Carta:
         self.opponentGrabbingCards = [
             halfStack[i] for i in range(1, len(halfStack), 2)
         ]
+        self.grabbingCardsInPlay = self.yourGrabbingCards + self.opponentGrabbingCards
 
         # First handle your grabbing cards, then opponents
         self.lastWords = [
@@ -312,8 +331,89 @@ class Carta:
             (self.doneButton.x + self.GUIParameters.leftDoneMargin,
              self.doneButton.y + self.GUIParameters.topDoneMargin))
 
-    # The function updates dragIndex, mouse, offset
-    def selectCard(self, event, dragIndex, mouse, offset):
+    # Save the starting time of the round
+    def saveStartTime_ms(self):
+        self.startTime = self.getTime_ms()
+
+    # Save the time where player select the grabbing card
+    def saveYourTime_ms(self):
+        self.yourTime = self.getTime_ms()
+
+    # Save the grabbing card that was selected
+    def saveYourGrabbingcard(self, grabbingIndex):
+        self.info.yourGrabbingCard = self.cards[grabbedIndex]
+
+    def checkGrabbingAvailable():
+        for i in range(len(self.grabbingCardsInPlay)):
+            if (self.grabbingCardsInPlay[i].getLastWord() ==
+                    self.currentReadingCard.getLastWord()):
+                return True
+        return False
+
+    # Stupid AI TODO: not validated
+    def opponentMove(self):
+        takeCorrectCard = False
+        random.seed(time.time())
+        x = random.uniform(0, 1)
+        if (x <= self.parameters.opponentSuccessProb):
+            takeCorrectCard = True
+        for i in range(len(self.grabbingCardsInPlay)):
+            if ((self.grabbingCardsInPlay[i].getLastWord() == self.currentReadingCard.getLastWord()) and \
+                (takeCorrectCard)):
+                self.info.opponentGrabbingCard = self.grabbingCardsInPlay[i]
+                break
+            elif ((self.grabbingCardsInPlay[i].getLastWord() != self.currentReadingCard.getLastWord()) and \
+                  (not takeCorrectCard)):
+                self.info.opponentGrabbingCard = self.grabbingCardsInPlay[i]
+                break
+
+        self.info.opponentTime = self.info.startTime + self.parameters.opponentTimeForStupidAI
+        self.info.opponentMoved = True
+
+    # TODO: not validated
+    def decideWinner(self):
+        # Both player grabbed the right card, but you grabbed it faster than opponent
+        if ((self.info.yourGrabbingCard == self.currentReadingCard.getLastWord()) and \
+            (self.info.opponentGrabbingCard == self.currentReadingCard.getlastWord()) and \
+            (self.info.yourTime < self.info.opponentTime)):
+            self.info.youWin = True
+        # Both player grabbed the right card, but opponent grabbed it faster than you
+        elif ((self.info.yourGrabbingCard == self.currentReadingCard.getLastWord()) and \
+              (self.info.opponentGrabbingCard == self.currentReadingCard.getlastWord()) and \
+              (self.info.yourTime > self.info.opponentTime)):
+            self.info.youWin = False
+        # you didn't grabbed the right card, but opponent garbbed the right card
+        elif ((self.info.yourGrabbingCard != self.currentReadingCard.getLastWord()) and \
+              (self.info.opponentGrabbingCard == self.currentReadingCard.getlastWord())):
+            self.info.youWin = False
+        # you grabbed the right card, but opponent didn't garbbed the right card
+        elif ((self.info.yourGrabbingCard == self.currentReadingCard.getLastWord()) and \
+              (self.info.opponentGrabbingCard != self.currentReadingCard.getlastWord())):
+            self.info.youWin = True
+        # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
+        # and both player didn't grabbed any grabbing card, then both player wins
+        elif (((self.getTime_ms() - self.startTime) >= 18000) and \
+              (checkGrabbingAvailable() is False) and \
+              (self.info.yourGrabbingCard == None) and \
+              (self.info.opponentGrabbingCard == None)):
+            self.info.youWin = True
+        # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
+        # and opponent didn't grabbed any grabbing card, but you garbbed a card, then opponent wins
+        elif (((self.getTime_ms() - self.startTime) >= 18000) and \
+              (checkGrabbingAvailable() is False) and \
+              (self.info.yourGrabbingCard != None) and \
+              (self.info.opponentGrabbingCard == None)):
+            self.info.youWin = True
+        # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
+        # and opponentgrabbed a grabbing card, but you didn't grabbed any card, then you wins
+        elif (((self.getTime_ms() - self.startTime) >= 18000) and \
+              (checkGrabbingAvailable() is False) and \
+              (self.info.yourGrabbingCard == None) and \
+              (self.info.opponentGrabbingCard != None)):
+            self.info.youWin = True
+
+    # The function updates dragIndex, grabbingIndex, mouse, offset
+    def selectCard(self, event, dragIndex, grabbingIndex, mouse, offset):
         for j in range(len(self.cards)):
             # If mouse click is on self.cards[j]
             if self.cards[j].collidepoint(event.pos):
@@ -321,6 +421,7 @@ class Carta:
                 self.touchYourCard = (j < len(self.cards) // 2)
                 mouse.x, mouse.y = event.pos
                 dragIndex[0] = j
+                grabbingIndex[0] = j
                 offset.x = self.cards[dragIndex[0]].x - mouse.x
                 offset.y = self.cards[dragIndex[0]].y - mouse.y
                 self.cardColors[j] = self.colors.yellow
@@ -345,7 +446,7 @@ class Carta:
             self.phase == Phase.GRABBING
 
     # The function updates dragIndex, mouse, offset
-    def handleEvent(self, event, dragIndex, mouse, offset):
+    def handleEvent(self, event, dragIndex, grabbingIndex, mouse, offset):
         if event.type == pygame.QUIT:  # Click the X in the window
             self.running = False
 
@@ -357,11 +458,14 @@ class Carta:
         # 5 = scroll down
         elif ((event.type == pygame.MOUSEBUTTONDOWN) and \
               (event.button == 1)):
-            self.selectCard(event, dragIndex, mouse, offset)
+            self.selectCard(event, dragIndex, grabbingIndex, mouse, offset)
             # TODO Why need this if?
-            if (self.phase == Phase.YOUR_SET_UP):
+            if (self.phase is Phase.YOUR_SET_UP):
                 self.pressDoneButton(event, mouse)
                 self.drawReadingCard()
+            if (self.phase is Phase.GRABBING):
+                self.saveYourTime_ms()
+                self.saveYourGrabbingCard(grabbingIndex)
 
         # The below only works in your set up phase
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
@@ -392,13 +496,15 @@ class Carta:
 
     def process(self):
         dragIndex = [0]  # index of the card being dragged
+        grabbingIndex = [0]  # index of the card being grabbed
         # record mouse position relative to left top corner of the whole screen
         mouse = Point(0, 0)
         # record left top corner of the dragging card relative to mouse position
         offset = Point(0, 0)
         while self.running:
             for event in pygame.event.get():
-                self.handleEvent(event, dragIndex, mouse, offset)
+                self.handleEvent(event, dragIndex, grabbingIndex, mouse,
+                                 offset)
 
             # Rendering
             self.fillScreens()
@@ -410,7 +516,15 @@ class Carta:
             # TODO: Why if (phase == GRABBING) does not work here?
             if ((self.phase is Phase.DRAWING)
                     or (self.phase is Phase.GRABBING)):
+                self.saveStartTime_ms()
                 self.renderReadingCardWords()
+                if (self.info.opponentMoved is False):
+                    self.opponentMove()
+                if (self.getTime_ms() -
+                        self.startTime == self.parameters.maxGrabbingTime):
+                    if (self.info.yourTime is None):
+                        self.saveYourTime_ms()
+                    self.decideWinner()
 
             pygame.display.flip()  # update rendering contents
             self.clock.tick(self.GUIParameters.FPS)
