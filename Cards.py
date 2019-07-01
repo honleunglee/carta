@@ -3,6 +3,7 @@ class ReadingCard:
         self.firstWord = firstWord
         self.lastWord = lastWord
         self.index = -1
+        self.fullWord = firstWord + " " + lastWord
 
     def setIndex(self, i):
         self.index = i
@@ -12,6 +13,9 @@ class ReadingCard:
 
     def getLastWord(self):
         return self.lastWord
+
+    def getFullWord(self):
+        return self.fullWord
 
     def getIndex(self):
         return self.index
