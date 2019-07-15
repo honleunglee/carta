@@ -92,12 +92,11 @@ class CartaParameters:  # constant parameters
     def __init__(self):
         self.opponentTimeForStupidAI = 10000  # ms
         self.maxGrabbingTime = 18000  # ms
-        self.maxEndGrabbingTime = 19000
         self.opponentSuccessProb = 0.8
 
 class Carta:
-    def __init__(self):
-        self.initGame()
+    def __init__(self, debugMode):
+        self.initGame(debugMode)
         self.initRendering()
         self.initReadingCards()
         self.initCardFrames()
@@ -106,12 +105,12 @@ class Carta:
         self.clock = pygame.time.Clock()
         self.running = True  # track if the game is running
 
-    def initGame(self):
+    def initGame(self, debugMode):
         pygame.init()
         self.GPinfo = GrabPhaseInfo()
         self.parameters = CartaParameters()
         self.phase = Phase.OPPONENT_SET_UP
-        self.debugMode = False  # default is False
+        self.debugMode = debugMode
 
         self.usedGrabbingCards = CardStack([])  # grabbed grabbing card
         self.usedReadingCards = CardStack([])  # read reading card
@@ -308,7 +307,7 @@ class Carta:
         self.screen.blit(textsurface, (self.doneButton.x + self.GUIParameters.leftDoneMargin,
                                        self.doneButton.y + self.GUIParameters.topDoneMargin))
 
-    # Check if the time between start time and current time larger than or at least self.parameters.maxGrabbingTime
+    # Check if the time between start time and current time at least self.parameters.maxGrabbingTime
     def checkTime(self):
         if ((self.getTime_ms() - self.GPinfo.startTime >= self.parameters.maxGrabbingTime) and \
             (self.GPinfo.timesUp is False)):
