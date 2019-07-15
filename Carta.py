@@ -1,98 +1,13 @@
-import pygame
 import sys
 
 if sys.version_info[0] < 3:
     execfile("Cards.py")
     execfile("CardStack.py")
+    execfile("CartaUtils.py")
 else:
     exec (open("Cards.py").read())
     exec (open("CardStack.py").read())
-
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-# Color palette; members in Red-Green-Blue (RGB) values
-# (x, x, x), each x is 0-255, 255 = 2^8-1
-class Colors:
-    def __init__(self):
-        self.white = (255, 255, 255)
-        self.lightGreen = (193, 223, 192)
-        self.black = (0, 0, 0)
-        self.red = (255, 0, 0)
-        self.blue = (0, 0, 255)
-        self.yellow = (255, 255, 0)
-        self.lightBlue = (4, 234, 250)
-        self.green = (0, 255, 0)
-
-class GUIParameters:  # const parameters
-    def __init__(self):
-        self.screenWidth = 1000
-        self.screenHeight = 563  # 16:9 ratio
-        self.FPS = 30  # upper bound per frames per second
-        self.cardWidth = 52
-        self.cardHeight = 73
-        self.wordBoxWidth = 270  # Width for wordBox from reading card
-        self.wordBoxHeight = 200  # Height for wordBox from reading card
-        self.numFrames = 72  # card frames (number of frames per row * self.numCardRows)
-        self.frameThickness = 3
-        self.horizontalSpacing = 1  # between two frames
-        self.verticalSpacing = 10  # between two rows of frames
-        self.extraVerticalSpacing = self.verticalSpacing * 2
-        self.fontSize = 18
-        self.wordFontSize = 36  # for reading card word font size
-        self.buttonFontSize = 24
-        self.numCardRows = 6
-        self.leftMargin = 20  # for grabbing cards in the screen
-        self.topMargin = 20  # for grabbing cards in the screen
-        self.wordLeftMargin = 10  # Reading card word in the wordBox
-        self.wordTopMargin = 85  # Reading card word in the wordBox
-        self.infoScreenStartX = self.screenWidth * 7 // 10
-        self.wordBoxStart = Point(720, 100)  # left top for wordBox from reading word
-        self.stackStart = Point(750, 400)  # left top point for stack of grabbing cards
-        self.leftCardMargin = 5  # for last word in a grabbing card
-        self.topCardMargin = 5  # for last word in a grabbing card
-        self.doneButtonStart = Point(816, 300)  # left top for "Done" button box
-        self.buttonBoxWidth = 70  # Width for "Done" button box
-        self.buttonBoxHeight = 40  # Height for "Done" button box
-        self.leftDoneMargin = 10  # for "Done" button in the button box
-        self.topDoneMargin = 10  # for "Done" button in the button box
-        self.leftTimeMargin = 5  # for time in info screen
-        self.topTimeMargin = 5  # for time in info screen
-        self.displayLatency = 500  # display one character in reading card every self.displayLatency ms
-
-# Carta Game Phase enum (in python 3, import enum as Enum)
-# Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
-class Phase:
-    INVALID = 0  # none of the states below
-    OPPONENT_SET_UP = 1  # opoonent setting his/her cards in his/her field
-    YOUR_SET_UP = 2  # you setting your cards in your field
-    GRABBING = 3  # grabbing: compete between you and opponent
-    OPPONENT_ADJUSTMENT = 4  # opponent may give a card to you
-    YOUR_ADJUSTMENT = 5  # you may give a card to opponent
-    END_GAME = 6
-
-class GrabPhaseInfo:
-    def __init__(self):
-        self.savedStartTime = False
-        self.startTime = 0  # time of the grabbing phase's start
-        self.yourGrabCardLastWord = ""
-        self.yourTime = None  # time of pressing the grabbing card
-        self.oppoGrabCardLastWord = ""
-        self.opponentTime = None  # time of opponent pressing the grabbing card
-        self.oppoGrabbedCard = False
-        self.timesUp = False
-        self.ended = False
-        self.youGrabbedCard = False
-        self.youWin = False
-        self.opponentWin = False
-
-class CartaParameters:  # constant parameters
-    def __init__(self):
-        self.opponentTimeForStupidAI = 10000  # ms
-        self.maxGrabbingTime = 18000  # ms
-        self.opponentSuccessProb = 0.8
+    exec (open("CartaUtils.py").read())
 
 class Carta:
     def __init__(self, debugMode):
@@ -189,36 +104,48 @@ class Carta:
         halfStack = grabbingCardStack.draw(len(GRABBING_CARDS) // 2)
         self.yourGrabbingCards = [halfStack[i] for i in range(0, len(halfStack), 2)]
         self.opponentGrabbingCards = [halfStack[i] for i in range(1, len(halfStack), 2)]
-        self.grabbingCardsInPlay = self.yourGrabbingCards + self.opponentGrabbingCards
 
         # First handle your grabbing cards, then opponents
+        # TODO: remove lastWords
         self.lastWords = [card.getLastWord() for card in self.yourGrabbingCards]
         self.lastWords += [card.getLastWord() for card in self.opponentGrabbingCards]
 
         # grabbing cards as rectangles in screen
         # First half is yours, second half is opponent's
+        # TODO: remove self.cards, self.cardColors
         self.cards = [None] * len(self.lastWords)
         self.cardColors = [self.colors.white] * len(self.lastWords)
 
         # Your cards start at the card stack on the right of screen
-        for i in range(len(self.cards) // 2):
-            self.cards[i] = pygame.rect.Rect(self.GUIParameters.stackStart.x, self.GUIParameters.stackStart.y,
-                                             self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
+        for i in range(len(self.yourGrabbingCards)):
+            pygameRect = pygame.rect.Rect(self.GUIParameters.stackStart.x, self.GUIParameters.stackStart.y,
+                                          self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
+            self.cards[i] = pygameRect
+            self.yourGrabbingCards[i].setRect(pygameRect)
+            self.yourGrabbingCards[i].setColor(self.colors.white)
+            self.yourGrabbingCards[i].setStatus(GrabCardStatus.YOU)
 
         if (self.phase == Phase.OPPONENT_SET_UP):
             # Opponent cards start at their designated positions
             # For now, assume they are randomly placed
             frameIndexList = [k for k in range(0, len(self.frames) // 2)]
-            # sample (len(self.cards) // 2) indices from (len(self.frames) // 2) frames
+            # sample (len(self.yourGrabbingCards) // 2) indices from (len(self.frames) // 2) frames
             random.seed(time.time())
             sampledFrames = random.sample(frameIndexList, self.numOppoGrabCardInPlay)
 
-            for i in range(len(self.cards) // 2, len(self.cards)):
-                frameIndex = sampledFrames[i - (len(self.cards) // 2)]
-                self.cards[i] = pygame.rect.Rect(self.frames[frameIndex][0][0], self.frames[frameIndex][0][1],
-                                                 self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
+            for i in range(len(self.opponentGrabbingCards)):
+                frameIndex = sampledFrames[i]
+                pygameRect = pygame.rect.Rect(self.frames[frameIndex][0][0], self.frames[frameIndex][0][1],
+                                              self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
+                self.cards[i + len(self.yourGrabbingCards)] = pygameRect
+                self.opponentGrabbingCards[i].setRect(pygameRect)
+                self.opponentGrabbingCards[i].setColor(self.colors.white)
+                self.opponentGrabbingCards[i].setStatus(GrabCardStatus.OPPONENT)
+                self.opponentGrabbingCards[i].setFrameIndex(frameIndex)
+
             self.phase = Phase.YOUR_SET_UP
 
+        self.grabbingCardsInPlay = self.yourGrabbingCards + self.opponentGrabbingCards
         self.cardDragging = False
         self.touchYourCard = False
 
@@ -260,21 +187,23 @@ class Carta:
         for j in range(len(self.frames) // 2, len(self.frames)):
             pygame.draw.lines(self.screen, self.colors.blue, True, self.frames[j], self.GUIParameters.frameThickness)
 
+    # TODO: not use cardIndex
     def renderSingleCardAndWord(self, cardIndex):
         # self.cards and self.lastWords share the same indexing
         pygame.draw.rect(self.screen, self.cardColors[cardIndex], self.cards[cardIndex])
         textsurface = self.font.render(self.lastWords[cardIndex], False, self.colors.black)
 
-        if (cardIndex >= len(self.cards) // 2):  # card is on opponent field
+        if (cardIndex >= len(self.grabbingCardsInPlay) // 2):  # card is on opponent field
             textsurface = pygame.transform.rotate(textsurface, 180)
 
         self.screen.blit(textsurface, (self.cards[cardIndex].x + self.GUIParameters.leftCardMargin,
                                        self.cards[cardIndex].y + self.GUIParameters.topCardMargin))
 
+    # TODO: not use dragIndex
     def renderGrabbingCardsAndWords(self, dragIndex):
         # Render cards and write last words on the cards
         # First render the non-dragging cards
-        for i in range(len(self.cards) - 1, -1, -1):
+        for i in range(len(self.grabbingCardsInPlay) - 1, -1, -1):
             if (i is not dragIndex):
                 self.renderSingleCardAndWord(i)
 
@@ -425,8 +354,9 @@ class Carta:
         self.GPinfo.ended = True
 
     # The function updates dragIndex, grabbingIndex, mouse, offset
+    # TODO: dragIndex, grabbingIndex can be combined into one?????
     def selectCard(self, event, dragIndex, grabbingIndex, mouse, offset):
-        for j in range(len(self.cards)):
+        for j in range(len(self.grabbingCardsInPlay)):
             # If mouse click is on self.cards[j]
             if self.cards[j].collidepoint(event.pos):
                 self.cardDragging = (self.phase == Phase.YOUR_SET_UP)
@@ -502,14 +432,15 @@ class Carta:
               (event.button == 1)):
             self.cardColors[dragIndex[0]] = self.colors.white
             if (self.cardDragging and self.touchYourCard):
-                frameIndex = self.findNearestFrame(Point(self.cards[dragIndex[0]].x, self.cards[dragIndex[0]].y))
+                frameIndex = self.findNearestFrame(self.grabbingCardsInPlay[dragIndex[0]].getPos())
                 self.cards[dragIndex[0]].x = self.frames[frameIndex][0][0]
                 self.cards[dragIndex[0]].y = self.frames[frameIndex][0][1]
-                cardIndex = dragIndex[0]
+                self.grabbingCardsInPlay[dragIndex[0]].setRectX(self.frames[frameIndex][0][0])
+                self.grabbingCardsInPlay[dragIndex[0]].setRectY(self.frames[frameIndex][0][1])
                 frameIndexOffset = frameIndex - (len(self.frames) // 2)
                 self.occupied[frameIndexOffset] = True
                 self.numYourFramesOccupied += 1
-                self.cardToFrameMap[cardIndex] = frameIndex
+                self.cardToFrameMap[dragIndex[0]] = frameIndex
 
                 self.cardDragging = False
                 self.touchYourCard = False
@@ -521,6 +452,8 @@ class Carta:
             mouse.x, mouse.y = event.pos
             self.cards[dragIndex[0]].x = mouse.x + offset.x
             self.cards[dragIndex[0]].y = mouse.y + offset.y
+            self.grabbingCardsInPlay[dragIndex[0]].setRectX(mouse.x + offset.x)
+            self.grabbingCardsInPlay[dragIndex[0]].setRectY(mouse.y + offset.y)
 
     def process(self):
         dragIndex = [0]  # index of the card being dragged
