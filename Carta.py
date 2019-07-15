@@ -83,7 +83,7 @@ class GrabPhaseInfo:
         self.opponentTime = None  # time of opponent pressing the grabbing card
         self.oppoGrabbedCard = False
         self.timesUp = False
-        self.roundEnded = False
+        self.ended = False
         self.youGrabbedCard = False
         self.youWin = False
         self.opponentWin = False
@@ -91,7 +91,7 @@ class GrabPhaseInfo:
 class CartaParameters:  # constant parameters
     def __init__(self):
         self.opponentTimeForStupidAI = 10000  # ms
-        self.maxStartGrabbingTime = 18000  # ms
+        self.maxGrabbingTime = 18000  # ms
         self.maxEndGrabbingTime = 19000
         self.opponentSuccessProb = 0.8
 
@@ -308,10 +308,10 @@ class Carta:
         self.screen.blit(textsurface, (self.doneButton.x + self.GUIParameters.leftDoneMargin,
                                        self.doneButton.y + self.GUIParameters.topDoneMargin))
 
-    # Check if the time between start time and current time is 18 sec
+    # Check if the time between start time and current time larger than or at least self.parameters.maxGrabbingTime
     def checkTime(self):
-        if ((self.getTime_ms() - self.GPinfo.startTime >= self.parameters.maxStartGrabbingTime) and \
-            (self.getTime_ms() - self.GPinfo.startTime <= self.parameters.maxEndGrabbingTime)):
+        if ((self.getTime_ms() - self.GPinfo.startTime >= self.parameters.maxGrabbingTime) and \
+            (self.GPinfo.timesUp is False)):
             self.GPinfo.timesUp = True
 
     # Save the starting time of the round
@@ -365,40 +365,40 @@ class Carta:
 
     def decideWinner(self):
         statement = ""
-        # Both player grabbed the right card, but you grabbed it faster than opponent
+        # Both players grabbed the right card, but you grabbed it faster than opponent
         if ((self.GPinfo.yourGrabCardLastWord == self.curReadingCard.getLastWord()) and \
             (self.GPinfo.oppoGrabCardLastWord == self.curReadingCard.getLastWord()) and \
             (self.GPinfo.yourTime < self.GPinfo.opponentTime)):
             self.GPinfo.youWin = True
             self.GPinfo.opponentWin = False
-            statement = "Both player grabbed the right card, but you grabbed it faster than opponent"
-        # Both player grabbed the right card, but opponent grabbed it faster than you
+            statement = "Carta.py: decideWinner: Both players grabbed the right card, but you grabbed it faster than opponent"
+        # Both players grabbed the right card, but opponent grabbed it faster than you
         elif ((self.GPinfo.yourGrabCardLastWord == self.curReadingCard.getLastWord()) and \
               (self.GPinfo.oppoGrabCardLastWord == self.curReadingCard.getLastWord()) and \
               (self.GPinfo.yourTime > self.GPinfo.opponentTime)):
             self.GPinfo.youWin = False
             self.GPinfo.opponentWin = True
-            statement = "Both player grabbed the right card, but opponent grabbed it faster than you"
+            statement = "Carta.py: decideWinner: Both players grabbed the right card, but opponent grabbed it faster than you"
         # you didn't grab the right card, but opponent grabbed the right card
         elif ((self.GPinfo.yourGrabCardLastWord != self.curReadingCard.getLastWord()) and \
               (self.GPinfo.oppoGrabCardLastWord == self.curReadingCard.getLastWord())):
             self.GPinfo.youWin = False
-            statement = "you didn't grab the right card, but opponent grabbed the right card"
+            statement = "Carta.py: decideWinner: you didn't grab the right card, but opponent grabbed the right card"
         # you grabbed the right card, but opponent didn't grab the right card
         elif ((self.GPinfo.yourGrabCardLastWord == self.curReadingCard.getLastWord()) and \
               (self.GPinfo.oppoGrabCardLastWord != self.curReadingCard.getLastWord())):
             self.GPinfo.youWin = True
             self.GPinfo.opponentWin = False
-            statement = "you grabbed the right card, but opponent didn't grab the right card"
+            statement = "Carta.py: decideWinner: you grabbed the right card, but opponent didn't grab the right card"
         # if the time pass 18 seconds after start time and it checks that there is no grabbing card match the last word of the currentReadingcard,
-        # and both player didn't grabbed any grabbing card, then both player wins
+        # and both players didn't grabbed any grabbing card, then both players win
         elif ((self.GPinfo.timesUp is True) and \
               (self.checkGrabbingAvailable() is False) and \
               (self.GPinfo.yourGrabCardLastWord == "") and \
               (self.GPinfo.oppoGrabCardLastWord == "")):
             self.GPinfo.youWin = True
             self.GPinfo.opponentWin = True
-            statement = "No available GrabCard, both players win"
+            statement = "Carta.py: decideWinner: No available GrabCard, both players win"
         # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
         # and opponent didn't grabbed any grabbing card, but you garbbed a card, then opponent wins
         elif ((self.GPinfo.timesUp is True) and \
@@ -407,7 +407,7 @@ class Carta:
               (self.GPinfo.oppoGrabCardLastWord == "")):
             self.GPinfo.youWin = False
             self.GPinfo.opponentWin = True
-            statement = "No available GrabCard, opponent win"
+            statement = "Carta.py: decideWinner: No available GrabCard, opponent win"
         # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
         # and opponentgrabbed a grabbing card, but you didn't grabbed any card, then you wins
         elif ((self.GPinfo.timesUp is True) and \
@@ -416,16 +416,14 @@ class Carta:
               (self.GPinfo.oppoGrabCardLastWord != "")):
             self.GPinfo.youWin = True
             self.GPinfo.opponentWin = False
-            statement = "No available GrabCard, you win"
+            statement = "Carta.py: decideWinner: No available GrabCard, you win"
         else:
             self.GPinfo.youWin = False
             self.GPinfo.opponentWin = False
-            statement = "Both players grab wrong card"
+            statement = "Carta.py: decideWinner: Both players grab wrong card"
         if (self.debugMode):
             print(statement)
-        if (self.GPinfo.youWin):
-            print("You Win")
-        self.GPinfo.roundEnded = True
+        self.GPinfo.ended = True
 
     # The function updates dragIndex, grabbingIndex, mouse, offset
     def selectCard(self, event, dragIndex, grabbingIndex, mouse, offset):
@@ -551,7 +549,7 @@ class Carta:
                 self.renderReadingCardWords()
                 if (self.GPinfo.oppoGrabbedCard is False):
                     self.opponentGrabsCard()
-                if ((self.GPinfo.roundEnded is False) and (self.GPinfo.timesUp is True)):
+                if ((self.GPinfo.ended is False) and (self.GPinfo.timesUp is True)):
                     if (self.GPinfo.yourTime is None):
                         self.saveYourTime_ms()
                     self.decideWinner()
