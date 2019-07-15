@@ -6,6 +6,11 @@ else:
     exec (open("Carta.py").read())
 
 if __name__ == "__main__":
-    c = Carta()
+    debugMode = False
+    if (len(sys.argv) > 1):
+        if (sys.argv[1].lower() == "debug"):
+            debugMode = True
+
+    c = Carta(debugMode)
     c.process()
     c.quit()
