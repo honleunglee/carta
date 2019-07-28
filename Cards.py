@@ -1,3 +1,5 @@
+import pygame  # for grabbing card rect for rendering
+
 class ReadingCard:
     def __init__(self, firstWord, lastWord):
         self.firstWord = firstWord
@@ -20,7 +22,7 @@ class ReadingCard:
     def getIndex(self):
         return self.index
 
-class GrabbingCard:
+class PureGrabbingCard:
     def __init__(self, lastWord):
         self.lastWord = lastWord
         self.decisionWord = None
@@ -34,6 +36,46 @@ class GrabbingCard:
 
     def getLastWord(self):
         return self.lastWord
+
+# Card in your field, opponent's field, or none of the above
+class GrabCardStatus:
+    INVALID = 0  # none of the below
+    YOU = 1  # in your field
+    OPPONENT = 2  # in opponent's field
+
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+class GrabbingCard(PureGrabbingCard):
+    def __init__(self, lastWord):
+        PureGrabbingCard.__init__(self, lastWord)
+        self.rect = None  # the pygame rectangle for rendering
+        self.color = None
+        self.status = GrabCardStatus.INVALID
+        self.frameIndex = -1
+
+    def setRect(self, rect):
+        self.rect = rect
+
+    def setColor(self, color):
+        self.color = color
+
+    def setStatus(self, status):
+        self.status = status
+
+    def setFrameIndex(self, index):
+        self.frameIndex = index
+
+    def setRectX(self, x):
+        self.rect.x = x
+
+    def setRectY(self, y):
+        self.rect.y = y
+
+    def getPos(self):
+        return Point(self.rect.x, self.rect.y)
 
 READING_CARDS = [
     ReadingCard("Starbucks", "Coffee"),
@@ -138,9 +180,13 @@ READING_CARDS = [
     ReadingCard("Solar", "System")
 ]
 
+def generatePureGrabCardList(readingCardList):
+    return [PureGrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
+
 def generateGrabbingCardList(readingCardList):
     return [GrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
 
+PURE_GRABBING_CARDS = generatePureGrabCardList(READING_CARDS)
 GRABBING_CARDS = generateGrabbingCardList(READING_CARDS)
 
 def sortFirstWords(readingCardList):
