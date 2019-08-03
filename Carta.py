@@ -30,8 +30,6 @@ class Carta:
         self.usedGrabbingCards = CardStack([])  # grabbed grabbing card
         self.usedReadingCards = CardStack([])  # read reading card
 
-        self.numYourGrabCardInPlay = len(GRABBING_CARDS) // 4
-        self.numOppoGrabCardInPlay = len(GRABBING_CARDS) // 4
         self.displayReadCardStartTime = 0
 
         self.yourGrabCardAssigned = False
@@ -82,34 +80,40 @@ class Carta:
                    self.GUIParameters.verticalSpacing
 
     def initCardFrames(self):
-        self.frames = []  # card frames
+        self.opponentFrames = []
+        self.yourFrames = []
+
         start = Point(self.GUIParameters.leftMargin, self.GUIParameters.topMargin)
         stepX = self.GUIParameters.cardWidth + self.GUIParameters.horizontalSpacing
         for i in range(self.GUIParameters.numCardRows // 2):
-            self.setFramesInARow(stepX, start, self.frames)
+            self.setFramesInARow(stepX, start, self.opponentFrames)
 
         start.y += self.GUIParameters.extraVerticalSpacing  # separation between yours and opponent
 
         for i in range(self.GUIParameters.numCardRows // 2, self.GUIParameters.numCardRows):
-            self.setFramesInARow(stepX, start, self.frames)
+            self.setFramesInARow(stepX, start, self.yourFrames)
 
-        # only consider your frames
-        self.occupied = [False for i in range(len(self.frames) // 2)]
-        self.lastWordToFrameMap = {}  # both your and opponent card's last words and frames
+        self.occupied = {}
+        for frame in self.yourFrames:
+            # Note frame is a list which is not hashable, need to convert to tuple
+            # which is immutable and then hashable
+            self.occupied[tuple(frame)] = False
         self.numYourFramesOccupied = 0
 
     def initGrabbingCards(self):
         grabbingCardStack = CardStack(GRABBING_CARDS)
         grabbingCardStack.shuffle()
         halfStack = grabbingCardStack.draw(len(GRABBING_CARDS) // 2)
+
+        # constant variables, will not change at run time
         self.yourGrabbingCards = [halfStack[i] for i in range(0, len(halfStack), 2)]
         self.opponentGrabbingCards = [halfStack[i] for i in range(1, len(halfStack), 2)]
 
+        # change at run time. If one of below becomes zero, the corresponding player wins.
+        self.numYourGrabCardInPlay = len(self.yourGrabbingCards)
+        self.numOppoGrabCardInPlay = len(self.opponentGrabbingCards)
+
         # First handle your grabbing cards, then opponents
-
-        # grabbing cards as rectangles in screen
-        # First half is yours, second half is opponent's
-
         # Your cards start at the card stack on the right of screen
         for i in range(len(self.yourGrabbingCards)):
             pygameRect = pygame.rect.Rect(self.GUIParameters.stackStart.x, self.GUIParameters.stackStart.y,
@@ -121,23 +125,26 @@ class Carta:
         if (self.phase == Phase.OPPONENT_SET_UP):
             # Opponent cards start at their designated positions
             # For now, assume they are randomly placed
-            frameIndexList = [k for k in range(0, len(self.frames) // 2)]
-            # sample (len(self.yourGrabbingCards) // 2) indices from (len(self.frames) // 2) frames
+            frameIndexList = [k for k in range(len(self.opponentFrames))]
+            # sample len(self.opponentGrabbingCards) indices from len(self.opponentFrames) frames
             random.seed(time.time())
             sampledFrames = random.sample(frameIndexList, self.numOppoGrabCardInPlay)
 
-            for i in range(len(self.opponentGrabbingCards)):
-                frameIndex = sampledFrames[i]
-                pygameRect = pygame.rect.Rect(self.frames[frameIndex][0][0], self.frames[frameIndex][0][1],
-                                              self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
-                self.opponentGrabbingCards[i].setRect(pygameRect)
-                self.opponentGrabbingCards[i].setColor(self.colors.white)
-                self.opponentGrabbingCards[i].setStatus(GrabCardStatus.OPPONENT)
-                self.opponentGrabbingCards[i].setFrameIndex(frameIndex)
+            for i in range(self.numOppoGrabCardInPlay):
+                frame = self.opponentFrames[sampledFrames[i]]
+                pygameRect = pygame.rect.Rect(frame[0][0], frame[0][1], self.GUIParameters.cardWidth,
+                                              self.GUIParameters.cardHeight)
+                card = self.opponentGrabbingCards[i]
+                card.setRect(pygameRect)
+                card.setColor(self.colors.white)
+                card.setStatus(GrabCardStatus.OPPONENT)
+                card.setFrame(frame)
 
             self.phase = Phase.YOUR_SET_UP
 
+        # change at run time
         self.grabbingCardsInPlay = self.yourGrabbingCards + self.opponentGrabbingCards
+
         self.cardDragging = False
         self.touchYourCard = False
 
@@ -152,16 +159,16 @@ class Carta:
     # pos is the position of left top corner of a card
     def findNearestFrame(self, pos):
         minDistanceSq = sys.float_info.max
-        bestFrameIndex = self.GUIParameters.numFrames
+        nearestFrame = None
         # for loop over your frames (not all frames)
-        for i in range(self.GUIParameters.numFrames // 2, self.GUIParameters.numFrames):
-            if not self.occupied[i - (self.GUIParameters.numFrames // 2)]:
-                distSq = (self.frames[i][0][0] - pos.x)**2 + \
-                         (self.frames[i][0][1] - pos.y)**2
+        # note: as long as self.yourFrames has no None, this function must return no None
+        for frame in self.yourFrames:
+            if not self.occupied[tuple(frame)]:
+                distSq = (frame[0][0] - pos.x)**2 + (frame[0][1] - pos.y)**2
                 if (distSq < minDistanceSq):
                     minDistanceSq = distSq
-                    bestFrameIndex = i
-        return bestFrameIndex
+                    nearestFrame = frame
+        return nearestFrame
 
     def fillScreens(self):
         self.screen.fill(self.colors.lightGreen)
@@ -174,10 +181,10 @@ class Carta:
                                        self.infoScreen.y + self.GUIParameters.topTimeMargin))
 
     def renderCardFrames(self):
-        for j in range(len(self.frames) // 2):
-            pygame.draw.lines(self.screen, self.colors.red, True, self.frames[j], self.GUIParameters.frameThickness)
-        for j in range(len(self.frames) // 2, len(self.frames)):
-            pygame.draw.lines(self.screen, self.colors.blue, True, self.frames[j], self.GUIParameters.frameThickness)
+        for frame in self.opponentFrames:
+            pygame.draw.lines(self.screen, self.colors.red, True, frame, self.GUIParameters.frameThickness)
+        for frame in self.yourFrames:
+            pygame.draw.lines(self.screen, self.colors.blue, True, frame, self.GUIParameters.frameThickness)
 
     def renderSingleCardAndWord(self, card):
         if (card is None):
@@ -363,29 +370,30 @@ class Carta:
                 offset.x = selectedCard.getRectX() - mouse.x
                 offset.y = selectedCard.getRectY() - mouse.y
                 selectedCard.setColor(self.colors.yellow)
-                if selectedCard.getLastWord() in self.lastWordToFrameMap:
-                    frameIndex = self.lastWordToFrameMap[selectedCard.getLastWord()] - (len(self.frames) // 2)
-                    self.occupied[frameIndex] = False
+                if ((selectedCard.getFrame() is not None) and self.touchYourCard):
+                    # self.occupied is only about your side.
+                    self.occupied[tuple(selectedCard.getFrame())] = False
                     self.numYourFramesOccupied -= 1
                 break
         return selectedCard
 
+    # only run at initialization
     def randomAssignYourGrabCards(self):
-        frameIndexList = [k for k in range(len(self.frames) // 2, len(self.frames))]
+        frameIndexList = [k for k in range(len(self.yourFrames))]
 
-        # self.numYourGrabCardInPlay indices from (len(self.frames) // 2) frames
+        # self.numYourGrabCardInPlay indices from len(self.yourFrames) frames
         random.seed(time.time())
         sampledFrames = random.sample(frameIndexList, self.numYourGrabCardInPlay)
 
         for i in range(self.numYourGrabCardInPlay):
-            frameIndex = sampledFrames[i]
-            pygameRect = pygame.rect.Rect(self.frames[frameIndex][0][0], self.frames[frameIndex][0][1],
-                                          self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
-            card = self.grabbingCardsInPlay[i]
+            frame = self.yourFrames[sampledFrames[i]]
+            pygameRect = pygame.rect.Rect(frame[0][0], frame[0][1], self.GUIParameters.cardWidth,
+                                          self.GUIParameters.cardHeight)
+            card = self.yourGrabbingCards[i]
             card.setRect(pygameRect)
-            lastWord = card.getLastWord()
-            self.lastWordToFrameMap[lastWord] = frameIndex
-            self.occupied[self.lastWordToFrameMap[lastWord] - (len(self.frames) // 2)] = True
+            card.setFrame(frame)
+            if tuple(frame) in self.occupied:
+                self.occupied[tuple(frame)] = True
             self.numYourFramesOccupied += 1
 
         self.yourGrabCardAssigned = True
@@ -434,13 +442,12 @@ class Carta:
               (selectedCard is not None)):
             selectedCard.setColor(self.colors.white)
             if (self.cardDragging and self.touchYourCard):
-                frameIndex = self.findNearestFrame(selectedCard.getPos())
-                selectedCard.setRectX(self.frames[frameIndex][0][0])
-                selectedCard.setRectY(self.frames[frameIndex][0][1])
-                frameIndexOffset = frameIndex - (len(self.frames) // 2)
-                self.occupied[frameIndexOffset] = True
+                frame = self.findNearestFrame(selectedCard.getPos())
+                selectedCard.setRectX(frame[0][0])
+                selectedCard.setRectY(frame[0][1])
+                selectedCard.setFrame(frame)
+                self.occupied[tuple(frame)] = True
                 self.numYourFramesOccupied += 1
-                self.lastWordToFrameMap[selectedCard.getLastWord()] = frameIndex
 
                 self.cardDragging = False
                 self.touchYourCard = False
