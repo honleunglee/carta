@@ -180,6 +180,8 @@ class Carta:
             pygame.draw.lines(self.screen, self.colors.blue, True, self.frames[j], self.GUIParameters.frameThickness)
 
     def renderSingleCardAndWord(self, card):
+        if (card is None):
+            return
         pygame.draw.rect(self.screen, card.getColor(), card.getRect())
         textsurface = self.font.render(card.getLastWord(), False, self.colors.black)
 
@@ -191,14 +193,13 @@ class Carta:
             (card.getRectX() + self.GUIParameters.leftCardMargin, card.getRectY() + self.GUIParameters.topCardMargin))
 
     def renderGrabbingCardsAndWords(self, selectedCard):
-        if (selectedCard is None):
-            return
-
         # Render cards and write last words on the cards
         # First render the not selected cards
         for i in range(len(self.grabbingCardsInPlay) - 1, -1, -1):
             grabbingCard = self.grabbingCardsInPlay[i]
-            if (grabbingCard.sameLastWord(selectedCard) is False):
+            if (selectedCard is None):
+                self.renderSingleCardAndWord(grabbingCard)
+            elif (grabbingCard.sameLastWord(selectedCard) is False):
                 self.renderSingleCardAndWord(grabbingCard)
 
         # Render the selected card, to make sure it is always
@@ -247,7 +248,8 @@ class Carta:
 
     # Save the grabbing card that you selected
     def saveYourGrabbingCard(self, yourGrabbingCard):
-        if (self.GPinfo.youGrabbedCard is False):
+        if ((self.GPinfo.youGrabbedCard is False) and \
+            (yourGrabbingCard is not None)):
             self.GPinfo.yourGrabCardLastWord = yourGrabbingCard.getLastWord()
             self.GPinfo.youGrabbedCard = True
 
@@ -347,8 +349,10 @@ class Carta:
             print(statement)
         self.GPinfo.ended = True
 
-    # The function updates selectedCard, mouse, offset
-    def selectCard(self, event, selectedCard, mouse, offset):
+    # return selectedCard if any
+    def selectCard(self, event, mouse, offset):
+        selectedCard = None
+        # self.grabbingCardsInPLay cannot contain or include None
         for j in range(len(self.grabbingCardsInPlay)):
             # If mouse click is on self.grabbingCardsInPlay[j].getRect()
             if self.grabbingCardsInPlay[j].getRect().collidepoint(event.pos):
@@ -364,6 +368,7 @@ class Carta:
                     self.occupied[frameIndex] = False
                     self.numYourFramesOccupied -= 1
                 break
+        return selectedCard
 
     def randomAssignYourGrabCards(self):
         frameIndexList = [k for k in range(len(self.frames) // 2, len(self.frames))]
@@ -402,7 +407,7 @@ class Carta:
             self.numReadCardChars = 0
             self.displayReadingCard = True
 
-    # The function updates selectedCard, mouse, offset
+    #return selected Card if any
     def handleEvent(self, event, selectedCard, mouse, offset):
         if event.type == pygame.QUIT:  # Click the X in the window
             self.running = False
@@ -415,7 +420,7 @@ class Carta:
         # 5 = scroll down
         elif ((event.type == pygame.MOUSEBUTTONDOWN) and \
               (event.button == 1)):
-            self.selectCard(event, selectedCard, mouse, offset)
+            selectedCard = self.selectCard(event, mouse, offset)
             if (self.phase is Phase.GRABBING):
                 self.saveYourTime_ms()
                 self.saveYourGrabbingCard(selectedCard)
@@ -448,20 +453,17 @@ class Carta:
             mouse.x, mouse.y = event.pos
             selectedCard.setRectX(mouse.x + offset.x)
             selectedCard.setRectY(mouse.y + offset.y)
+        return selectedCard
 
     def process(self):
         selectedCard = None
-        if (len(self.grabbingCardsInPlay) > 0):
-            selectedCard = self.grabbingCardsInPlay[0]
         # record mouse position relative to left top corner of the whole screen
         mouse = Point(0, 0)
         # record left top corner of the selected card relative to mouse position
         offset = Point(0, 0)
         while self.running:
             for event in pygame.event.get():
-                self.handleEvent(event, selectedCard, mouse, offset)
-            print("selected color: (%d, %d, %d)" % (selectedCard.getColor()[0], selectedCard.getColor()[1], selectedCard.getColor()[2]))
-
+                selectedCard = self.handleEvent(event, selectedCard, mouse, offset)
             self.fillScreens()
             self.renderTime()
             self.renderCardFrames()
