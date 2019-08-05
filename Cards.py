@@ -1,4 +1,4 @@
-import pygame  # for grabbing card rect for rendering
+import pygame  # for grabbing card rect, frame rect for rendering
 
 class ReadingCard:
     def __init__(self, firstWord, lastWord):
@@ -60,7 +60,7 @@ class GrabbingCard(PureGrabbingCard):
         self.rect = None  # the pygame rectangle for rendering
         self.color = None
         self.status = GrabCardStatus.INVALID
-        self.frameIndex = -1
+        self.frame = None
 
     def setRect(self, rect):
         self.rect = rect
@@ -71,8 +71,8 @@ class GrabbingCard(PureGrabbingCard):
     def setStatus(self, status):
         self.status = status
 
-    def setFrameIndex(self, index):
-        self.frameIndex = index
+    def setFrame(self, frame):
+        self.frame = frame
 
     def setRectX(self, x):
         self.rect.x = x
@@ -88,6 +88,9 @@ class GrabbingCard(PureGrabbingCard):
 
     def getStatus(self):
         return self.status
+
+    def getFrame(self):
+        return self.frame
 
     def getRectX(self):
         return self.rect.x

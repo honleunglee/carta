@@ -1,9 +1,5 @@
 import sys
-
-if sys.version_info[0] < 3:
-    execfile("Carta.py")
-else:
-    exec (open("Carta.py").read())
+import Carta
 
 if __name__ == "__main__":
     debugMode = False
@@ -11,6 +7,7 @@ if __name__ == "__main__":
         if (sys.argv[1].lower() == "debug"):
             debugMode = True
 
-    c = Carta(debugMode)
+    # First Carta means Carta.py, second Carta means class name Carta
+    c = Carta.Carta(debugMode)
     c.process()
     c.quit()
