@@ -37,6 +37,12 @@ class PureGrabbingCard:
     def getLastWord(self):
         return self.lastWord
 
+    def sameLastWord(self, grabbingCard):
+        if (grabbingCard is not None):
+            return (self.lastWord == grabbingCard.getLastWord())
+        else:
+            return False
+
 # Card in your field, opponent's field, or none of the above
 class GrabCardStatus:
     INVALID = 0  # none of the below
@@ -73,6 +79,21 @@ class GrabbingCard(PureGrabbingCard):
 
     def setRectY(self, y):
         self.rect.y = y
+
+    def getRect(self):
+        return self.rect
+
+    def getColor(self):
+        return self.color
+
+    def getStatus(self):
+        return self.status
+
+    def getRectX(self):
+        return self.rect.x
+
+    def getRectY(self):
+        return self.rect.y
 
     def getPos(self):
         return Point(self.rect.x, self.rect.y)
