@@ -407,7 +407,7 @@ class Carta:
             self.numReadCardChars = 0
             self.displayReadingCard = True
 
-    #return selected Card if any
+    # return selected Card if any
     def handleEvent(self, event, selectedCard, mouse, offset):
         if event.type == pygame.QUIT:  # Click the X in the window
             self.running = False
@@ -453,6 +453,7 @@ class Carta:
             mouse.x, mouse.y = event.pos
             selectedCard.setRectX(mouse.x + offset.x)
             selectedCard.setRectY(mouse.y + offset.y)
+
         return selectedCard
 
     def process(self):

@@ -38,7 +38,10 @@ class PureGrabbingCard:
         return self.lastWord
 
     def sameLastWord(self, grabbingCard):
-        return (self.lastWord == grabbingCard.getLastWord())
+        if (grabbingCard is not None):
+            return (self.lastWord == grabbingCard.getLastWord())
+        else:
+            return False
 
 # Card in your field, opponent's field, or none of the above
 class GrabCardStatus:
