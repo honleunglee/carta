@@ -46,7 +46,7 @@ class Carta:
         # for reading card word
         self.wordFont = pygame.font.SysFont('freesans', self.GUIParameters.wordFontSize)
         # for "Done" button word
-        self.doneFont = pygame.font.SysFont('freesand', self.GUIParameters.buttonFontSize)
+        self.doneFont = pygame.font.SysFont('freesans', self.GUIParameters.buttonFontSize)
 
         self.infoScreen = pygame.rect.Rect(self.GUIParameters.infoScreenStartX, 0,
                                            self.GUIParameters.screenWidth - self.GUIParameters.infoScreenStartX,
@@ -239,60 +239,86 @@ class Carta:
                                        self.doneButton.y + self.GUIParameters.topDoneMargin))
 
     # Check if the time between start time and current time at least self.parameters.maxGrabbingTime
-    def checkTime(self):
+    def checkTimesUp(self):
         if ((self.getTime_ms() - self.GPinfo.startTime >= self.parameters.maxGrabbingTime) and \
             (self.GPinfo.timesUp is False)):
             self.GPinfo.timesUp = True
 
-    # Save the starting time of the round
-    def saveStartTime_ms(self):
+    # Save the starting time of the grabbing phase
+    def saveGrabPhaseStartTime_ms(self):
         self.GPinfo.startTime = self.getTime_ms()
         self.GPinfo.savedStartTime = True
 
-    # Save the time where player select the grabbing card
-    def saveYourTime_ms(self):
+    # Save the time where you grab a card
+    def saveYourGrabTime_ms(self):
         self.GPinfo.yourTime = self.getTime_ms()
 
     # Save the grabbing card that you selected
     def saveYourGrabbingCard(self, yourGrabbingCard):
-        if ((self.GPinfo.youGrabbedCard is False) and \
+        if ((self.GPinfo.yourGrabCard is None) and \
             (yourGrabbingCard is not None)):
             self.GPinfo.yourGrabCardLastWord = yourGrabbingCard.getLastWord()
-            self.GPinfo.youGrabbedCard = True
+            self.GPinfo.yourGrabCard = yourGrabbingCard
 
+    # TODO: Deprecate this
     def checkGrabbingAvailable(self):
-        for i in range(len(self.grabbingCardsInPlay)):
-            if (self.grabbingCardsInPlay[i].getLastWord() == self.curReadingCard.getLastWord()):
+        for card in self.grabbingCardsInPlay:
+            if (card.getLastWord() == self.curReadingCard.getLastWord()):
                 return True
         return False
 
-    # Stupid AI: validated
-    def opponentGrabsCard(self):
+    def decideCorrectGrabCardStatus(self):
+        for card in self.grabbingCardsInPlay:
+            if (card.getLastWord() == self.curReadingCard.getLastWord()):
+                self.GPinfo.correctGrabCardStatus = card.getStatus()
+
+    # returns true if and only if
+    # 1) the correct grabbing card is on the opposite side of the touched grabbing card; OR
+    # 2) correct grabbing card not in play but the touched card is in play
+    def isFalseTouch(self, correctCardStatus, touchedCardStatus):
+        return ((correctCardStatus is GrabCardStatus.YOU and touchedCardStatus is GrabCardStatus.OPPONENT)
+                or (correctCardStatus is GrabCardStatus.OPPONENT and touchedCardStatus is GrabCardStatus.YOU)
+                or (correctCardStatus is GrabCardStatus.INVALID and touchedCardStatus is not GrabCardStatus.INVALID))
+
+    # Stupid AI
+    # Note: opponent will not take a wrong card on the same side as the correct card.
+    def opponentRespondsInGrabPhase(self):
         takeCorrectCard = False
         random.seed(time.time())
         x = random.uniform(0, 1)
         if (x <= self.parameters.opponentSuccessProb):
             takeCorrectCard = True
-        for i in range(len(self.grabbingCardsInPlay)):
-            if ((self.grabbingCardsInPlay[i].getLastWord() == self.curReadingCard.getLastWord()) and \
+
+        for card in self.grabbingCardsInPlay:
+            if ((card.getLastWord() == self.curReadingCard.getLastWord()) and \
                 (takeCorrectCard)):
-                self.GPinfo.oppoGrabCardLastWord = self.grabbingCardsInPlay[i].getLastWord()
+                self.GPinfo.oppoGrabCardLastWord = card.getLastWord()
+                self.GPinfo.oppoGrabCard = card
+                self.GPinfo.oppoStatus = GrabPhaseStatus.TRUE_TOUCH
                 break
-            elif ((self.grabbingCardsInPlay[i].getLastWord() != self.curReadingCard.getLastWord()) and \
-                  (not takeCorrectCard)):
-                self.GPinfo.oppoGrabCardLastWord = self.grabbingCardsInPlay[i].getLastWord()
+            elif ((card.getLastWord() != self.curReadingCard.getLastWord()) and \
+                  (not takeCorrectCard) and \
+                  self.isFalseTouch(self.GPinfo.correctGrabCardStatus, card.getStatus())):
+                self.GPinfo.oppoGrabCardLastWord = card.getLastWord()
+                self.GPinfo.oppoGrabCard = card
+                self.GPinfo.oppoStatus = GrabPhaseStatus.FALSE_TOUCH
                 break
 
         self.GPinfo.opponentTime = self.GPinfo.startTime + self.parameters.opponentTimeForStupidAI
-        self.GPinfo.oppoGrabbedCard = True
 
         if (self.debugMode):
-            if ((takeCorrectCard) and (self.GPinfo.oppoGrabCardLastWord != "")):
-                print("Carta.py: opponentGrabsCard: opponent take correct card")
-            elif (not takeCorrectCard):
-                print("Carta.py: opponentGrabsCard: opponent take wrong card")
+            if (self.GPinfo.oppoStatus is GrabPhaseStatus.TRUE_TOUCH):
+                print("Carta.py: opponentRespondsInGrabPhase: opponent takes correct card #%s#" \
+                      % self.GPinfo.oppoGrabCardLastWord)
+            elif (self.GPinfo.oppoStatus is GrabPhaseStatus.FALSE_TOUCH):
+                if (self.GPinfo.correctGrabCardStatus is GrabCardStatus.INVALID):
+                    print("Carta.py: opponentRespondsInGrabPhase: opponent takes wrong card #%s#, right card N/A" \
+                          % self.GPinfo.oppoGrabCardLastWord)
+                else:
+                    print("Carta.py: opponentRespondsInGrabPhase: opponent takes wrong card #%s#, right card available" \
+                          % self.GPinfo.oppoGrabCardLastWord)
             else:
-                print("Carta.py: opponentGrabsCard: opponent wants the correct card, but it is not available")
+                print("Carta.py: opponentRespondsInGrabPhase: opponent does not touch any card")
 
     def decideWinner(self):
         statement = ""
@@ -354,18 +380,18 @@ class Carta:
             statement = "Carta.py: decideWinner: Both players grab wrong card"
         if (self.debugMode):
             print(statement)
-        self.GPinfo.ended = True
+        self.phase = Phase.OPPONENT_TRANSFER
 
     # return selectedCard if any
     def selectCard(self, event, mouse, offset):
         selectedCard = None
         # self.grabbingCardsInPLay cannot contain or include None
-        for j in range(len(self.grabbingCardsInPlay)):
+        for card in self.grabbingCardsInPlay:
             # If mouse click is on self.grabbingCardsInPlay[j].getRect()
-            if self.grabbingCardsInPlay[j].getRect().collidepoint(event.pos):
+            if card.getRect().collidepoint(event.pos):
                 self.cardDragging = (self.phase == Phase.YOUR_SET_UP)
                 mouse.x, mouse.y = event.pos
-                selectedCard = self.grabbingCardsInPlay[j]
+                selectedCard = card
                 self.touchYourCard = (selectedCard.getStatus() is GrabCardStatus.YOU)
                 offset.x = selectedCard.getRectX() - mouse.x
                 offset.y = selectedCard.getRectY() - mouse.y
@@ -430,7 +456,7 @@ class Carta:
               (event.button == 1)):
             selectedCard = self.selectCard(event, mouse, offset)
             if (self.phase is Phase.GRABBING):
-                self.saveYourTime_ms()
+                self.saveYourGrabTime_ms()
                 self.saveYourGrabbingCard(selectedCard)
             if (self.phase == Phase.YOUR_SET_UP):
                 self.pressDoneButton(event, mouse)
@@ -482,14 +508,14 @@ class Carta:
             self.renderGrabbingCardsAndWords(selectedCard)
             if (self.displayReadingCard):
                 if (self.GPinfo.savedStartTime is False):
-                    self.saveStartTime_ms()
-                self.checkTime()
+                    self.saveGrabPhaseStartTime_ms()
+                self.checkTimesUp()
                 self.renderReadingCardWords()
-                if (self.GPinfo.oppoGrabbedCard is False):
-                    self.opponentGrabsCard()
-                if ((self.GPinfo.ended is False) and (self.GPinfo.timesUp is True)):
+                if ((self.phase is Phase.GRABBING) and (self.GPinfo.timesUp is True)):
                     if (self.GPinfo.yourTime is None):
-                        self.saveYourTime_ms()
+                        self.saveYourGrabTime_ms()
+                    self.decideCorrectGrabCardStatus()
+                    self.opponentRespondsInGrabPhase()
                     self.decideWinner()
 
             pygame.display.flip()  # update rendering contents

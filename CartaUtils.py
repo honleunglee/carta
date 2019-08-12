@@ -54,9 +54,15 @@ class Phase:
     OPPONENT_SET_UP = 1  # opoonent setting his/her cards in his/her field
     YOUR_SET_UP = 2  # you setting your cards in your field
     GRABBING = 3  # grabbing: compete between you and opponent
-    OPPONENT_ADJUSTMENT = 4  # opponent may give a card to you
-    YOUR_ADJUSTMENT = 5  # you may give a card to opponent
+    OPPONENT_TRANSFER = 4  # opponent may give a card to you
+    YOUR_TRANSFER = 5  # you may give a card to opponent
     END_GAME = 6
+
+# Per player
+class GrabPhaseStatus:
+    NO_TOUCH = 0
+    TRUE_TOUCH = 1
+    FALSE_TOUCH = 2
 
 class GrabPhaseInfo:
     def __init__(self):
@@ -66,12 +72,16 @@ class GrabPhaseInfo:
         self.yourTime = None  # time of pressing the grabbing card
         self.oppoGrabCardLastWord = ""
         self.opponentTime = None  # time of opponent pressing the grabbing card
-        self.oppoGrabbedCard = False
         self.timesUp = False
-        self.ended = False
-        self.youGrabbedCard = False
         self.youWin = False
         self.opponentWin = False
+        self.yourGrabCard = None
+        self.oppoGrabCard = None
+        self.yourStatus = GrabPhaseStatus.NO_TOUCH
+        self.oppoStatus = GrabPhaseStatus.NO_TOUCH
+        # correct grabbing card not available,
+        # on your side, or on opponent's side
+        self.correctGrabCardStatus = GrabCardStatus.INVALID
 
 class CartaParameters:  # constant parameters
     def __init__(self):
