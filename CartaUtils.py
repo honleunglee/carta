@@ -30,23 +30,31 @@ class GUIParameters:  # const parameters
         self.fontSize = 12
         self.wordFontSize = 24  # for reading card word font size
         self.buttonFontSize = 18
+        self.dialogWordFont = 14
         self.numCardRows = 6
         self.leftMargin = 20  # for grabbing cards in the screen
         self.topMargin = 20  # for grabbing cards in the screen
         self.wordLeftMargin = 10  # Reading card word in the wordBox
         self.wordTopMargin = 85  # Reading card word in the wordBox
         self.infoScreenStartX = self.screenWidth * 7 // 10
-        self.wordBoxStart = Point(720, 100)  # left top for wordBox from reading word
-        self.stackStart = Point(750, 400)  # left top point for stack of grabbing cards
+        self.wordBoxStart = Point(720, 50)  # left top for wordBox from reading word
+        self.stackStart = Point(720, 400)  # left top point for stack of grabbing cards
         self.maxNumLetters = 6  # maximum number of letters allowed in one row in a grabbing card
         self.leftCardMargin = 2  # for last word in a grabbing card
         self.topCardMargin = 1  # for last word in a grabbing card
-        self.doneButtonStart = Point(816, 300)  # left top for "Done" button box
+        self.doneButtonStart = Point(720, 260)  # left top for "Done" button box
         self.buttonBoxWidth = 70  # Width for "Done" button box
         self.buttonBoxHeight = 40  # Height for "Done" button box
         self.leftTimeMargin = 5  # for time in info screen
         self.topTimeMargin = 5  # for time in info screen
         self.displayLatency = 500  # display one character in reading card every self.displayLatency ms
+        self.dialogBoxStart = Point(800, 260)
+        self.dialogBoxWidth = 190
+        self.dialogBoxHeight = 290
+        self.dialogLeftMargin = 5
+        self.dialogTopMargin = 5
+        self.dialogsSpacing = 14
+        self.maxNumDialogRows = 21
 
 # Carta Game Phase enum (in python 3, import enum as Enum)
 # Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
@@ -79,6 +87,7 @@ class GrabPhaseInfo:
         self.opponentWin = False
         self.yourGrabCard = None
         self.oppoGrabCard = None
+        self.correctGrabCard = None
         self.yourStatus = GrabPhaseStatus.NO_TOUCH
         self.oppoStatus = GrabPhaseStatus.NO_TOUCH
         # correct grabbing card not available,
@@ -86,7 +95,23 @@ class GrabPhaseInfo:
         self.correctGrabCardStatus = GrabCardStatus.INVALID
 
     def reset(self):
-        pass
+        self.savedStartTime = False
+        self.startTime = 0  # time of the grabbing phase's start
+        self.yourGrabCardLastWord = ""
+        self.yourTime = None  # time of pressing the grabbing card
+        self.oppoGrabCardLastWord = ""
+        self.opponentTime = None  # time of opponent pressing the grabbing card
+        self.timesUp = False
+        self.youWin = False
+        self.opponentWin = False
+        self.yourGrabCard = None
+        self.oppoGrabCard = None
+        self.correctGrabCard = None
+        self.yourStatus = GrabPhaseStatus.NO_TOUCH
+        self.oppoStatus = GrabPhaseStatus.NO_TOUCH
+        # correct grabbing card not available,
+        # on your side, or on opponent's side
+        self.correctGrabCardStatus = GrabCardStatus.INVALID
 
 class CartaParameters:  # constant parameters
     def __init__(self):
