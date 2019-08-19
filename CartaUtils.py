@@ -51,12 +51,13 @@ class GUIParameters:  # const parameters
 # Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
 class Phase:
     INVALID = 0  # none of the states below
-    OPPONENT_SET_UP = 1  # opoonent setting his/her cards in his/her field
-    YOUR_SET_UP = 2  # you setting your cards in your field
-    GRABBING = 3  # grabbing: compete between you and opponent
-    OPPONENT_TRANSFER = 4  # opponent may give a card to you
-    YOUR_TRANSFER = 5  # you may give a card to opponent
-    END_GAME = 6
+    RESET = 1  # reset the game to a new round
+    OPPONENT_SET_UP = 2  # opoonent setting his/her cards in his/her field
+    YOUR_SET_UP = 3  # you setting your cards in your field
+    GRABBING = 4  # grabbing: compete between you and opponent
+    OPPONENT_TRANSFER = 5  # opponent may give a card to you
+    YOUR_TRANSFER = 6  # you may give a card to opponent
+    END_GAME = 7
 
 # Per player
 class GrabPhaseStatus:
@@ -82,6 +83,9 @@ class GrabPhaseInfo:
         # correct grabbing card not available,
         # on your side, or on opponent's side
         self.correctGrabCardStatus = GrabCardStatus.INVALID
+
+    def reset(self):
+        pass
 
 class CartaParameters:  # constant parameters
     def __init__(self):

@@ -2,10 +2,12 @@ import sys
 
 if sys.version_info[0] < 3:
     execfile("Cards.py")
+    execfile("CardAnalysis.py")
     execfile("CardStack.py")
     execfile("CartaUtils.py")
 else:
     exec (open("Cards.py").read())
+    exec (open("CardAnalysis.py").read())
     exec (open("CardStack.py").read())
     exec (open("CartaUtils.py").read())
 
@@ -32,7 +34,7 @@ class Carta:
 
         self.displayReadCardStartTime = 0
 
-        self.yourGrabCardAssigned = False
+        self.yourGrabCardsAssigned = False
 
     def initRendering(self):
         self.colors = Colors()
@@ -147,6 +149,19 @@ class Carta:
 
         self.cardDragging = False
         self.touchYourCard = False
+
+    # Reset variables before a new round starts
+    def reset(self):
+        if self.phase is Phase.RESET:
+            self.GPinfo.reset()
+            self.displayReadingCard = False
+            self.displayReadCardStartTime = 0
+            self.curReadingCard = None
+            self.numReadCardChars = 0
+            self.cardDragging = False
+            self.touchYourCard = False
+
+            self.phase = Phase.YOUR_SET_UP
 
     # 0 ms --> pygame.init(). Get current time relative to pygame.init().
     def getTime_ms(self):
@@ -280,6 +295,14 @@ class Carta:
                 or (correctCardStatus is GrabCardStatus.OPPONENT and touchedCardStatus is GrabCardStatus.YOU)
                 or (correctCardStatus is GrabCardStatus.INVALID and touchedCardStatus is not GrabCardStatus.INVALID))
 
+    def decideYourGrabPhaseStatus(self):
+        if ((self.GPinfo.yourGrabCard is not None) and \
+            (self.curReadingCard is not None)):
+            if (self.GPinfo.yourGrabCard.getLastWord() == self.curReadingCard.getLastWord()):
+                self.GPinfo.yourStatus = GrabPhaseStatus.TRUE_TOUCH
+            elif isFalseTouch(self.GPinfo.correctGrabCardStatus, self.GPinfo.yourGrabCard.getStatus()):
+                self.GPinfo.yourStatus = GrabPhaseStatus.FALSE_TOUCH
+
     # Stupid AI
     # Note: opponent will not take a wrong card on the same side as the correct card.
     def opponentRespondsInGrabPhase(self):
@@ -395,8 +418,13 @@ class Carta:
                 self.touchYourCard = (selectedCard.getStatus() is GrabCardStatus.YOU)
                 offset.x = selectedCard.getRectX() - mouse.x
                 offset.y = selectedCard.getRectY() - mouse.y
-                selectedCard.setColor(self.colors.yellow)
-                if ((selectedCard.getFrame() is not None) and self.touchYourCard):
+                if (selectedCard.getColor() is self.colors.white):
+                    selectedCard.setColor(self.colors.yellow)
+                elif (selectedCard.getColor() is self.colors.yellow):
+                    selectedCard.setColor(self.colors.white)
+                if ((selectedCard.getFrame() is not None) and \
+                    self.touchYourCard and \
+                    self.cardDragging):
                     # self.occupied is only about your side.
                     self.occupied[tuple(selectedCard.getFrame())] = False
                     self.numYourFramesOccupied -= 1
@@ -422,7 +450,7 @@ class Carta:
                 self.occupied[tuple(frame)] = True
             self.numYourFramesOccupied += 1
 
-        self.yourGrabCardAssigned = True
+        self.yourGrabCardsAssigned = True
 
     # The function updates mouse and phase
     def pressDoneButton(self, event, mouse):
@@ -466,7 +494,9 @@ class Carta:
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
               (event.button == 1) and \
               (selectedCard is not None)):
-            selectedCard.setColor(self.colors.white)
+            if ((selectedCard.getStatus() is GrabCardStatus.OPPONENT) or \
+                (self.phase is not Phase.YOUR_TRANSFER)):
+                selectedCard.setColor(self.colors.white)
             if (self.cardDragging and self.touchYourCard):
                 frame = self.findNearestFrame(selectedCard.getPos())
                 selectedCard.setRectX(frame[0][0])
@@ -502,7 +532,7 @@ class Carta:
             self.renderTime()
             self.renderCardFrames()
             if (self.phase is Phase.YOUR_SET_UP):
-                if (self.debugMode and self.yourGrabCardAssigned is False):
+                if (self.debugMode and self.yourGrabCardsAssigned is False):
                     self.randomAssignYourGrabCards()
                 self.renderDoneButton()
             self.renderGrabbingCardsAndWords(selectedCard)
@@ -515,6 +545,7 @@ class Carta:
                     if (self.GPinfo.yourTime is None):
                         self.saveYourGrabTime_ms()
                     self.decideCorrectGrabCardStatus()
+                    self.decideYourGrabPhaseStatus()
                     self.opponentRespondsInGrabPhase()
                     self.decideWinner()
 
