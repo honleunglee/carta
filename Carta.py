@@ -40,15 +40,15 @@ class Carta:
         self.colors = Colors()
         self.GUIParameters = GUIParameters()
         self.screen = pygame.display.set_mode((self.GUIParameters.screenWidth, self.GUIParameters.screenHeight))
-        pygame.display.set_caption("Carta")
+        pygame.display.set_caption(self.GUIParameters.windowName)
 
         pygame.font.init()
         # for grabbing card word
-        self.font = pygame.font.SysFont('freesans', self.GUIParameters.fontSize)
+        self.font = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.fontSize)
         # for reading card word
-        self.wordFont = pygame.font.SysFont('freesans', self.GUIParameters.wordFontSize)
+        self.wordFont = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.wordFontSize)
         # for "Done" button word
-        self.doneFont = pygame.font.SysFont('freesans', self.GUIParameters.buttonFontSize)
+        self.doneFont = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.buttonFontSize)
 
         self.infoScreen = pygame.rect.Rect(self.GUIParameters.infoScreenStartX, 0,
                                            self.GUIParameters.screenWidth - self.GUIParameters.infoScreenStartX,
@@ -204,15 +204,30 @@ class Carta:
     def renderSingleCardAndWord(self, card):
         if (card is None):
             return
+        # Draw the rectangle of the grabbing card
         pygame.draw.rect(self.screen, card.getColor(), card.getRect())
-        textsurface = self.font.render(card.getLastWord(), False, self.colors.black)
 
-        if (card.getStatus() is GrabCardStatus.OPPONENT):
-            textsurface = pygame.transform.rotate(textsurface, 180)
+        lastWord = card.getLastWord()
+        numRenderedChars = 0
+        numLines = 0
+        while numRenderedChars < len(lastWord):
+            text = lastWord[numRenderedChars:numRenderedChars + self.GUIParameters.maxNumLetters]
+            textsurface = self.font.render(text, False, self.colors.black)
+            textWidth, textHeight = textsurface.get_size()
 
-        self.screen.blit(
-            textsurface,
-            (card.getRectX() + self.GUIParameters.leftCardMargin, card.getRectY() + self.GUIParameters.topCardMargin))
+            leftTopPos = (card.getRectX() + self.GUIParameters.leftCardMargin,
+                          card.getRectY() + self.GUIParameters.topCardMargin + numLines * textHeight)
+
+            if (card.getStatus() is GrabCardStatus.OPPONENT):
+                textsurface = pygame.transform.rotate(textsurface, 180)
+                leftTopPos = (card.getRectX() + self.GUIParameters.cardWidth -
+                              self.GUIParameters.leftCardMargin - textWidth, \
+                              card.getRectY() + self.GUIParameters.cardHeight -
+                              self.GUIParameters.topCardMargin - (numLines + 1) * textHeight)
+
+            self.screen.blit(textsurface, leftTopPos)
+            numRenderedChars += self.GUIParameters.maxNumLetters
+            numLines += 1
 
     def renderGrabbingCardsAndWords(self, selectedCard):
         # Render cards and write last words on the cards
@@ -250,8 +265,10 @@ class Carta:
     def renderDoneButton(self):
         pygame.draw.rect(self.screen, self.colors.green, self.doneButton)
         textsurface = self.doneFont.render("Done", False, self.colors.black)
-        self.screen.blit(textsurface, (self.doneButton.x + self.GUIParameters.leftDoneMargin,
-                                       self.doneButton.y + self.GUIParameters.topDoneMargin))
+        width, height = textsurface.get_size()
+        self.screen.blit(textsurface, \
+                         (self.doneButton.x + (self.GUIParameters.buttonBoxWidth - width) // 2, \
+                          self.doneButton.y + (self.GUIParameters.buttonBoxHeight - height) // 2))
 
     # Check if the time between start time and current time at least self.parameters.maxGrabbingTime
     def checkTimesUp(self):
@@ -267,13 +284,6 @@ class Carta:
     # Save the time where you grab a card
     def saveYourGrabTime_ms(self):
         self.GPinfo.yourTime = self.getTime_ms()
-
-    # Save the grabbing card that you selected
-    def saveYourGrabbingCard(self, yourGrabbingCard):
-        if ((self.GPinfo.yourGrabCard is None) and \
-            (yourGrabbingCard is not None)):
-            self.GPinfo.yourGrabCardLastWord = yourGrabbingCard.getLastWord()
-            self.GPinfo.yourGrabCard = yourGrabbingCard
 
     # TODO: Deprecate this
     def checkGrabbingAvailable(self):
@@ -295,13 +305,24 @@ class Carta:
                 or (correctCardStatus is GrabCardStatus.OPPONENT and touchedCardStatus is GrabCardStatus.YOU)
                 or (correctCardStatus is GrabCardStatus.INVALID and touchedCardStatus is not GrabCardStatus.INVALID))
 
-    def decideYourGrabPhaseStatus(self):
-        if ((self.GPinfo.yourGrabCard is not None) and \
-            (self.curReadingCard is not None)):
-            if (self.GPinfo.yourGrabCard.getLastWord() == self.curReadingCard.getLastWord()):
-                self.GPinfo.yourStatus = GrabPhaseStatus.TRUE_TOUCH
-            elif isFalseTouch(self.GPinfo.correctGrabCardStatus, self.GPinfo.yourGrabCard.getStatus()):
-                self.GPinfo.yourStatus = GrabPhaseStatus.FALSE_TOUCH
+    def decideTouchedCardStatus(self, touchedCard):
+        status = GrabPhaseStatus.NO_TOUCH
+        if ((touchedCard is not None) and (self.curReadingCard is not None)):
+            if (touchedCard.getLastWord() == self.curReadingCard.getLastWord()):
+                status = GrabPhaseStatus.TRUE_TOUCH
+            elif self.isFalseTouch(self.GPinfo.correctGrabCardStatus, touchedCard.getStatus()):
+                status = GrabPhaseStatus.FALSE_TOUCH
+        return status
+
+    # Save the grabbing card that you selected
+    def saveYourGrabbingCard(self, yourGrabbingCard):
+        if ((self.GPinfo.yourGrabCard is None) and (yourGrabbingCard is not None)):
+            status = self.decideTouchedCardStatus(yourGrabbingCard)
+            if (status is not GrabPhaseStatus.NO_TOUCH):
+                self.GPinfo.yourGrabCardLastWord = yourGrabbingCard.getLastWord()
+                self.GPinfo.yourGrabCard = yourGrabbingCard
+                self.GPinfo.yourStatus = status
+                self.saveYourGrabTime_ms()
 
     # Stupid AI
     # Note: opponent will not take a wrong card on the same side as the correct card.
@@ -484,7 +505,6 @@ class Carta:
               (event.button == 1)):
             selectedCard = self.selectCard(event, mouse, offset)
             if (self.phase is Phase.GRABBING):
-                self.saveYourGrabTime_ms()
                 self.saveYourGrabbingCard(selectedCard)
             if (self.phase == Phase.YOUR_SET_UP):
                 self.pressDoneButton(event, mouse)
@@ -538,14 +558,13 @@ class Carta:
             self.renderGrabbingCardsAndWords(selectedCard)
             if (self.displayReadingCard):
                 if (self.GPinfo.savedStartTime is False):
+                    self.decideCorrectGrabCardStatus()
                     self.saveGrabPhaseStartTime_ms()
                 self.checkTimesUp()
                 self.renderReadingCardWords()
                 if ((self.phase is Phase.GRABBING) and (self.GPinfo.timesUp is True)):
                     if (self.GPinfo.yourTime is None):
                         self.saveYourGrabTime_ms()
-                    self.decideCorrectGrabCardStatus()
-                    self.decideYourGrabPhaseStatus()
                     self.opponentRespondsInGrabPhase()
                     self.decideWinner()
 
