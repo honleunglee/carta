@@ -36,6 +36,8 @@ class Carta:
 
         self.yourGrabCardsAssigned = False
 
+        self.numCardsToTransfer = 0
+
     def initRendering(self):
         self.colors = Colors()
         self.GUIParameters = GUIParameters()
@@ -47,6 +49,8 @@ class Carta:
         self.font = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.fontSize)
         # for reading card word
         self.wordFont = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.wordFontSize)
+        # for words in dialog box
+        self.dialogFont = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.dialogWordFont)
         # for "Done" button word
         self.doneFont = pygame.font.Font(self.GUIParameters.fontFile, self.GUIParameters.buttonFontSize)
 
@@ -54,8 +58,13 @@ class Carta:
                                            self.GUIParameters.screenWidth - self.GUIParameters.infoScreenStartX,
                                            self.GUIParameters.screenHeight)
 
+        self.dialogBox = pygame.rect.Rect(self.GUIParameters.dialogBoxStart.x, self.GUIParameters.dialogBoxStart.y,
+                                          self.GUIParameters.dialogBoxWidth, self.GUIParameters.dialogBoxHeight)
+
         self.doneButton = pygame.rect.Rect(self.GUIParameters.doneButtonStart.x, self.GUIParameters.doneButtonStart.y,
                                            self.GUIParameters.buttonBoxWidth, self.GUIParameters.buttonBoxHeight)
+
+        self.dialogs = []  # a queue for dialogs
 
         self.displayReadingCard = False  # True if to display reading card
 
@@ -100,7 +109,11 @@ class Carta:
             # Note frame is a list which is not hashable, need to convert to tuple
             # which is immutable and then hashable
             self.occupied[tuple(frame)] = False
+
         self.numYourFramesOccupied = 0
+
+        for frame in self.opponentFrames:
+            self.occupied[tuple(frame)] = False
 
     def initGrabbingCards(self):
         grabbingCardStack = CardStack(GRABBING_CARDS)
@@ -134,15 +147,19 @@ class Carta:
 
             for i in range(self.numOppoGrabCardInPlay):
                 frame = self.opponentFrames[sampledFrames[i]]
-                pygameRect = pygame.rect.Rect(frame[0][0], frame[0][1], self.GUIParameters.cardWidth,
+                pygameRect = pygame.rect.Rect(frame[0][0], \
+                                              frame[0][1], \
+                                              self.GUIParameters.cardWidth, \
                                               self.GUIParameters.cardHeight)
                 card = self.opponentGrabbingCards[i]
                 card.setRect(pygameRect)
                 card.setColor(self.colors.white)
                 card.setStatus(GrabCardStatus.OPPONENT)
                 card.setFrame(frame)
+                self.occupied[tuple(frame)] = True
 
             self.phase = Phase.YOUR_SET_UP
+            self.dialogs.append("Your Set Up Phase Starts")
 
         # change at run time
         self.grabbingCardsInPlay = self.yourGrabbingCards + self.opponentGrabbingCards
@@ -160,8 +177,10 @@ class Carta:
             self.numReadCardChars = 0
             self.cardDragging = False
             self.touchYourCard = False
+            self.numCardsToTransfer = 0
 
             self.phase = Phase.YOUR_SET_UP
+            self.dialogs.append("Your Set Up Phase Starts")
 
     # 0 ms --> pygame.init(). Get current time relative to pygame.init().
     def getTime_ms(self):
@@ -201,8 +220,19 @@ class Carta:
         for frame in self.yourFrames:
             pygame.draw.lines(self.screen, self.colors.blue, True, frame, self.GUIParameters.frameThickness)
 
+    def renderDialogBox(self):
+        pygame.draw.rect(self.screen, self.colors.white, self.dialogBox)
+        if (len(self.dialogs) > 0):
+            if (len(self.dialogs) >= self.GUIParameters.maxNumDialogRows):
+                self.dialogs.pop(0)
+            for i in range(len(self.dialogs)):
+                textsurface = self.dialogFont.render(self.dialogs[i], False, self.colors.black)
+                self.screen.blit(textsurface,
+                                 (self.dialogBox.x + self.GUIParameters.dialogLeftMargin, self.dialogBox.y +
+                                  self.GUIParameters.dialogTopMargin + (i * self.GUIParameters.dialogsSpacing)))
+
     def renderSingleCardAndWord(self, card):
-        if (card is None):
+        if (card is None) or (card.getStatus() is GrabCardStatus.INVALID):
             return
         # Draw the rectangle of the grabbing card
         pygame.draw.rect(self.screen, card.getColor(), card.getRect())
@@ -285,17 +315,13 @@ class Carta:
     def saveYourGrabTime_ms(self):
         self.GPinfo.yourTime = self.getTime_ms()
 
-    # TODO: Deprecate this
-    def checkGrabbingAvailable(self):
-        for card in self.grabbingCardsInPlay:
-            if (card.getLastWord() == self.curReadingCard.getLastWord()):
-                return True
-        return False
-
     def decideCorrectGrabCardStatus(self):
         for card in self.grabbingCardsInPlay:
             if (card.getLastWord() == self.curReadingCard.getLastWord()):
                 self.GPinfo.correctGrabCardStatus = card.getStatus()
+                self.GPinfo.correctGrabCard = card
+                if (self.debugMode):
+                    card.setColor(self.colors.red)
 
     # returns true if and only if
     # 1) the correct grabbing card is on the opposite side of the touched grabbing card; OR
@@ -364,67 +390,195 @@ class Carta:
             else:
                 print("Carta.py: opponentRespondsInGrabPhase: opponent does not touch any card")
 
+    def removeCorrectGrabbingCard(self):
+        if (self.GPinfo.correctGrabCard is not None):
+            self.occupied[tuple(self.GPinfo.correctGrabCard.getFrame())] = False
+            self.GPinfo.correctGrabCard.setFrame(None)
+            self.GPinfo.correctGrabCard.setRect(None)
+            if (self.GPinfo.correctGrabCard.getStatus() is GrabCardStatus.YOU):
+                self.numYourFramesOccupied -= 1
+            self.GPinfo.correctGrabCard.setStatus(GrabCardStatus.INVALID)
+            self.usedGrabbingCards.cards.append(self.GPinfo.correctGrabCard)
+            self.grabbingCardsInPlay.remove(self.GPinfo.correctGrabCard)
+
+    def shouldOpponentTransfer(self, yourFalseTouch):
+        if (self.GPinfo.oppoGrabCard.getStatus() == GrabCardStatus.YOU):
+            self.phase = Phase.OPPONENT_TRANSFER
+            self.numCardsToTransfer += 1
+            self.numOppoGrabCardInPlay -= 1
+        elif (self.GPinfo.oppoGrabCard.getStatus() == GrabCardStatus.OPPONENT):
+            self.numOppoGrabCardInPlay -= 1
+
+        if (yourFalseTouch):
+            self.numCardsToTransfer += 1
+            self.numOppoGrabCardInPlay -= 1
+            self.numYourGrabCardInPlay += 1
+            self.phase = Phase.OPPONENT_TRANSFER
+
+    def shouldYouTransfer(self, oppoFalseTouch):
+        if (self.GPinfo.yourGrabCard.getStatus() == GrabCardStatus.YOU):
+            self.numYourGrabCardInPlay -= 1
+        elif (self.GPinfo.yourGrabCard.getStatus() == GrabCardStatus.OPPONENT):
+            self.phase = Phase.YOUR_TRANSFER
+            self.numCardsToTransfer += 1
+            self.numYourGrabCardInPlay -= 1
+
+        if (oppoFalseTouch):
+            self.numCardsToTransfer += 1
+            self.numOppoGrabCardInPlay += 1
+            self.numYourGrabCardInPlay -= 1
+            self.phase = Phase.YOUR_TRANSFER
+
+    def appendDialogsWhenDecidingWinner(self):
+        if ((self.GPinfo.youWin) and not (self.GPinfo.opponentWin)):
+            self.dialogs.append("You Win, Opponent Loses")
+        elif (not (self.GPinfo.youWin) and (self.GPinfo.opponentWin)):
+            self.dialogs.append("Opponent Wins, You Lose")
+        elif ((self.GPinfo.youWin) and (self.GPinfo.opponentWin)):
+            self.dialogs.append("Both Players Win")
+        elif (not (self.GPinfo.youWin) and not (self.GPinfo.opponentWin)):
+            self.dialogs.append("No one Wins")
+
+        if (self.phase == Phase.YOUR_TRANSFER):
+            self.dialogs.append("Your Transfer Starts")
+            if (self.numCardsToTransfer > 1):
+                self.dialogs.append("You give " + str(self.numCardsToTransfer) + " cards to opponent")
+            else:
+                self.dialogs.append("You give " + str(self.numCardsToTransfer) + " card to opponent")
+        elif (self.phase == Phase.OPPONENT_TRANSFER):
+            self.dialogs.append("Opponent Transfer Starts")
+            if (self.numCardsToTransfer > 1):
+                self.dialogs.append("Opponent gives " + str(self.numCardsToTransfer) + " cards to you")
+            else:
+                self.dialogs.append("Opponent gives " + str(self.numCardsToTransfer) + " card to you")
+        elif (self.phase == Phase.END_GAME):
+            self.dialogs.append("Game Ends")
+
     def decideWinner(self):
+        self.phase = Phase.RESET
         statement = ""
-        # Both players grabbed the right card, but you grabbed it faster than opponent
-        if ((self.GPinfo.yourGrabCardLastWord == self.curReadingCard.getLastWord()) and \
-            (self.GPinfo.oppoGrabCardLastWord == self.curReadingCard.getLastWord()) and \
-            (self.GPinfo.yourTime < self.GPinfo.opponentTime)):
-            self.GPinfo.youWin = True
-            self.GPinfo.opponentWin = False
-            statement = "Carta.py: decideWinner: Both players grabbed the right card, but you grabbed it faster than opponent"
-        # Both players grabbed the right card, but opponent grabbed it faster than you
-        elif ((self.GPinfo.yourGrabCardLastWord == self.curReadingCard.getLastWord()) and \
-              (self.GPinfo.oppoGrabCardLastWord == self.curReadingCard.getLastWord()) and \
-              (self.GPinfo.yourTime > self.GPinfo.opponentTime)):
-            self.GPinfo.youWin = False
-            self.GPinfo.opponentWin = True
-            statement = "Carta.py: decideWinner: Both players grabbed the right card, but opponent grabbed it faster than you"
-        # you didn't grab the right card, but opponent grabbed the right card
-        elif ((self.GPinfo.yourGrabCardLastWord != self.curReadingCard.getLastWord()) and \
-              (self.GPinfo.oppoGrabCardLastWord == self.curReadingCard.getLastWord())):
-            self.GPinfo.youWin = False
-            statement = "Carta.py: decideWinner: you didn't grab the right card, but opponent grabbed the right card"
-        # you grabbed the right card, but opponent didn't grab the right card
-        elif ((self.GPinfo.yourGrabCardLastWord == self.curReadingCard.getLastWord()) and \
-              (self.GPinfo.oppoGrabCardLastWord != self.curReadingCard.getLastWord())):
-            self.GPinfo.youWin = True
-            self.GPinfo.opponentWin = False
-            statement = "Carta.py: decideWinner: you grabbed the right card, but opponent didn't grab the right card"
-        # if the time pass 18 seconds after start time and it checks that there is no grabbing card match the last word of the currentReadingcard,
-        # and both players didn't grabbed any grabbing card, then both players win
-        elif ((self.GPinfo.timesUp is True) and \
-              (self.checkGrabbingAvailable() is False) and \
-              (self.GPinfo.yourGrabCardLastWord == "") and \
-              (self.GPinfo.oppoGrabCardLastWord == "")):
-            self.GPinfo.youWin = True
-            self.GPinfo.opponentWin = True
-            statement = "Carta.py: decideWinner: No available GrabCard, both players win"
-        # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
-        # and opponent didn't grabbed any grabbing card, but you garbbed a card, then opponent wins
-        elif ((self.GPinfo.timesUp is True) and \
-              (self.checkGrabbingAvailable() is False) and \
-              (self.GPinfo.yourGrabCardLastWord != "") and \
-              (self.GPinfo.oppoGrabCardLastWord == "")):
-            self.GPinfo.youWin = False
-            self.GPinfo.opponentWin = True
-            statement = "Carta.py: decideWinner: No available GrabCard, opponent win"
-        # if the time pass start time is 18 seconds and it checks that there is no grabbing card match the last word of the currentReadingcard,
-        # and opponentgrabbed a grabbing card, but you didn't grabbed any card, then you wins
-        elif ((self.GPinfo.timesUp is True) and \
-              (self.checkGrabbingAvailable() is False) and \
-              (self.GPinfo.yourGrabCardLastWord == "") and \
-              (self.GPinfo.oppoGrabCardLastWord != "")):
-            self.GPinfo.youWin = True
-            self.GPinfo.opponentWin = False
-            statement = "Carta.py: decideWinner: No available GrabCard, you win"
+        yourTrueTouch = (self.GPinfo.yourStatus is GrabPhaseStatus.TRUE_TOUCH)
+        yourFalseTouch = (self.GPinfo.yourStatus is GrabPhaseStatus.FALSE_TOUCH)
+        yourNoTouch = (self.GPinfo.yourStatus is GrabPhaseStatus.NO_TOUCH)
+        oppoTrueTouch = (self.GPinfo.oppoStatus is GrabPhaseStatus.TRUE_TOUCH)
+        oppoFalseTouch = (self.GPinfo.oppoStatus is GrabPhaseStatus.FALSE_TOUCH)
+        oppoNoTouch = (self.GPinfo.oppoStatus is GrabPhaseStatus.NO_TOUCH)
+
+        if (yourTrueTouch or oppoTrueTouch):
+            if (yourTrueTouch and oppoTrueTouch):
+                if (self.GPinfo.yourTime < self.GPinfo.opponentTime):
+                    self.GPinfo.youWin = True
+                    statement = "Carta.py: decideWinner: Both players grabbed the right card, but you grabbed it faster than opponent"
+                elif (self.GPinfo.yourTime > self.GPinfo.opponentTime):
+                    self.GPinfo.youWin = False
+                    statement = "Carta.py: decideWinner: Both players grabbed the right card, but opponent grabbed it faster than you"
+                else:
+                    random.seed(time.time())
+                    x = random.uniform(0, 1)
+                    if (x >= 0.5):
+                        self.GPinfo.youWin = True
+                        statement = "Carta.py: decideWinner: Both players grabbed the right card at the same time, but luck favors you"
+                    else:
+                        self.GPinfo.youWin = False
+                        statement = "Carta.py: decideWinner: Both players grabbed the right card at the same time, but luck favors opponent"
+            elif (yourTrueTouch and oppoNoTouch):
+                self.GPinfo.youWin = True
+                statement = "Carta.py: decideWinner: Available GrabCard, you grabbed the card, opponent didn't"
+            elif (oppoTrueTouch and yourNoTouch):
+                self.GPinfo.youWin = False
+                statement = "Carta.py: decideWinner: Available GrabCard, opponent grabbed the card, you didn't"
+            elif (yourTrueTouch and oppoFalseTouch):
+                self.GPinfo.youWin = True
+                statement = "Carta.py: decideWinner: you grabbed the right card, but opponent didn't grab the right card"
+            else:  # oppo true touch and your false touch
+                self.GPinfo.youWin = False
+                statement = "Carta.py: decideWinner: you grabbed the wrong card, but opponent grabbed the right card"
+
+            if (self.GPinfo.youWin):
+                self.GPinfo.opponentWin = False
+                self.shouldYouTransfer(oppoFalseTouch)
+            else:
+                self.GPinfo.opponentWin = True
+                self.shouldOpponentTransfer(yourFalseTouch)
+
+        elif (self.GPinfo.correctGrabCardStatus is GrabCardStatus.INVALID):
+            if (yourNoTouch and oppoNoTouch):
+                self.GPinfo.youWin = True
+                self.GPinfo.opponentWin = True
+                statement = "Carta.py: decideWinner: No available GrabCard, both players win"
+            elif (yourFalseTouch and oppoNoTouch):
+                self.GPinfo.youWin = False
+                self.GPinfo.opponentWin = True
+                statement = "Carta.py: decideWinner: No available GrabCard, opponent win"
+                self.phase = Phase.OPPONENT_TRANSFER
+                self.numCardsToTransfer += 1
+                self.numYourGrabCardInPlay += 1
+                self.numOppoGrabCardInPlay -= 1
+            elif (yourNoTouch and oppoFalseTouch):
+                self.GPinfo.youWin = True
+                self.GPinfo.opponentWin = False
+                statement = "Carta.py: decideWinner: No available GrabCard, you win"
+                self.phase = Phase.YOUR_TRANSFER
+                self.numCardsToTransfer += 1
+                self.numYourGrabCardInPlay -= 1
+                self.numOppoGrabCardInPlay += 1
+
+        elif (self.GPinfo.correctGrabCardStatus is not GrabCardStatus.INVALID):
+            if (yourFalseTouch and oppoNoTouch):
+                self.GPinfo.youWin = False
+                self.GPinfo.opponentWin = True
+                statement = "Carta.py: decideWinner: Available GrabCard, you grabbed the wrong card, opponent wins"
+                if (self.GPinfo.correctGrabCardStatus is GrabCardStatus.YOU):
+                    self.numOppoGrabCardInPlay -= 1
+                else:  # correct card in your's
+                    self.numOppoGrabCardInPlay -= 2
+                    self.numYourGrabCardInPlay += 1
+                self.phase = Phase.OPPONENT_TRANSFER
+                self.numCardsToTransfer += 1
+            elif (yourNoTouch and oppoFalseTouch):
+                self.GPinfo.youWin = True
+                self.GPinfo.opponentWin = False
+                statement = "Carta.py: decideWinner: Available GrabCard, opponent grabbed the wrong card, you win"
+                if (self.GPinfo.correctGrabCardStatus is GrabCardStatus.YOU):
+                    self.numYourGrabCardInPlay -= 2
+                    self.numOppoGrabCardInPlay += 1
+                else:  # correct card in opponent's
+                    self.numYourGrabCardInPlay -= 1
+                self.phase = Phase.YOUR_TRANSFER
+                self.numCardsToTransfer += 1
+
         else:
             self.GPinfo.youWin = False
             self.GPinfo.opponentWin = False
             statement = "Carta.py: decideWinner: Both players grab wrong card"
+
+        if ((self.numYourGrabCardInPlay == 0) or (self.numOppoGrabCardInPlay == 0)):
+            self.phase = Phase.END_GAME
+
+        self.appendDialogsWhenDecidingWinner()
+        self.usedReadingCards.cards.append(self.curReadingCard)
+        self.removeCorrectGrabbingCard()
+
         if (self.debugMode):
             print(statement)
-        self.phase = Phase.OPPONENT_TRANSFER
+            print("-------------------------------------------------")
+
+    def opponentTransfers(self):
+        while (self.numCardsToTransfer != 0):
+            random.seed(time.time())
+            x = random.randint(0, self.numOppoGrabCardInPlay - 1)
+            for card in self.grabbingCardsInPlay:
+                if (card.getLastWord() == self.grabbingCardsInPlay[self.numYourGrabCardInPlay + x].getLastWord()):
+                    pygameRect = pygame.rect.Rect(self.GUIParameters.stackStart.x, self.GUIParameters.stackStart.y,
+                                                  self.GUIParameters.cardWidth, self.GUIParameters.cardHeight)
+                    card.setRect(pygameRect)
+                    card.setFrame(None)
+                    card.setStatus(GrabCardStatus.YOU)
+                    self.numCardsToTransfer -= 1
+                    if (self.debugMode):
+                        print("Carta.py: opponentTransfers: Opponent gives #%s# to you" % card.getLastWord())
+                    break
+        self.phase = Phase.RESET
 
     # return selectedCard if any
     def selectCard(self, event, mouse, offset):
@@ -441,8 +595,12 @@ class Carta:
                 offset.y = selectedCard.getRectY() - mouse.y
                 if (selectedCard.getColor() is self.colors.white):
                     selectedCard.setColor(self.colors.yellow)
+                    if ((self.phase == Phase.YOUR_TRANSFER) and (self.touchYourCard)):
+                        self.numCardsToTransfer -= 1
                 elif (selectedCard.getColor() is self.colors.yellow):
                     selectedCard.setColor(self.colors.white)
+                    if ((self.phase == Phase.YOUR_TRANSFER) and (self.touchYourCard)):
+                        self.numCardsToTransfer += 1
                 if ((selectedCard.getFrame() is not None) and \
                     self.touchYourCard and \
                     self.cardDragging):
@@ -462,7 +620,9 @@ class Carta:
 
         for i in range(self.numYourGrabCardInPlay):
             frame = self.yourFrames[sampledFrames[i]]
-            pygameRect = pygame.rect.Rect(frame[0][0], frame[0][1], self.GUIParameters.cardWidth,
+            pygameRect = pygame.rect.Rect(frame[0][0], \
+                                          frame[0][1], \
+                                          self.GUIParameters.cardWidth, \
                                           self.GUIParameters.cardHeight)
             card = self.yourGrabbingCards[i]
             card.setRect(pygameRect)
@@ -480,7 +640,45 @@ class Carta:
             (self.phase == Phase.YOUR_SET_UP) and \
             (self.numYourFramesOccupied >= self.numYourGrabCardInPlay)):
             self.phase = Phase.GRABBING
+            self.dialogs.append("Grabbing Phase Starts")
             self.displayReadCardStartTime = self.getTime_ms()
+
+        if ((self.doneButton.collidepoint(event.pos)) and \
+            (self.phase == Phase.YOUR_TRANSFER)):
+            if (self.numCardsToTransfer != 0):
+                self.dialogs.append("Still have " + str(self.numCardsToTransfer) + " cards to Transfer")
+            elif (self.numCardsToTransfer == 0):
+                selectedTransferCards = []
+                for card in self.grabbingCardsInPlay:
+                    if (card.getColor() is self.colors.yellow):
+                        card.setStatus(GrabCardStatus.OPPONENT)
+                        card.setColor(self.colors.white)
+                        self.occupied[tuple(card.getFrame())] = False
+                        self.numYourFramesOccupied -= 1
+                        selectedTransferCards.append(card)
+                for transferCard in selectedTransferCards:  # maximum of two
+                    frameIndexList = [k for k in range(len(self.opponentFrames))]
+                    random.seed(time.time())
+                    sampledFrames = random.sample(frameIndexList, self.numOppoGrabCardInPlay)
+                    for i in range(self.numOppoGrabCardInPlay):
+                        frame = self.opponentFrames[sampledFrames[i]]
+                        pygameRect = pygame.rect.Rect(frame[0][0], \
+                                                      frame[0][1], \
+                                                      self.GUIParameters.cardWidth, \
+                                                      self.GUIParameters.cardHeight)
+                        if tuple(frame) not in self.occupied:
+                            transferCard.setRect(pygameRect)
+                            transferCard.setFrame(frame)
+                            self.occupied[tuple(frame)] = True
+                            break
+                        elif tuple(frame) in self.occupied:
+                            if not self.occupied[tuple(frame)]:
+                                transferCard.setRect(pygameRect)
+                                transferCard.setFrame(frame)
+                                self.occupied[tuple(frame)] = True
+                                break
+
+                self.phase = Phase.RESET
 
     # Draw a reading card
     def drawReadingCard(self):
@@ -509,13 +707,15 @@ class Carta:
             if (self.phase == Phase.YOUR_SET_UP):
                 self.pressDoneButton(event, mouse)
                 self.drawReadingCard()
+            if (self.phase == Phase.YOUR_TRANSFER):
+                self.pressDoneButton(event, mouse)
 
         # The below only works in your set up phase
         elif ((event.type == pygame.MOUSEBUTTONUP) and \
               (event.button == 1) and \
               (selectedCard is not None)):
             if ((selectedCard.getStatus() is GrabCardStatus.OPPONENT) or \
-                (self.phase is not Phase.YOUR_TRANSFER)):
+                  (self.phase is not Phase.YOUR_TRANSFER)):
                 selectedCard.setColor(self.colors.white)
             if (self.cardDragging and self.touchYourCard):
                 frame = self.findNearestFrame(selectedCard.getPos())
@@ -551,6 +751,7 @@ class Carta:
             self.fillScreens()
             self.renderTime()
             self.renderCardFrames()
+            self.renderDialogBox()
             if (self.phase is Phase.YOUR_SET_UP):
                 if (self.debugMode and self.yourGrabCardsAssigned is False):
                     self.randomAssignYourGrabCards()
@@ -562,11 +763,18 @@ class Carta:
                     self.saveGrabPhaseStartTime_ms()
                 self.checkTimesUp()
                 self.renderReadingCardWords()
-                if ((self.phase is Phase.GRABBING) and (self.GPinfo.timesUp is True)):
+                if ((self.phase is Phase.GRABBING) and \
+                    (self.GPinfo.timesUp is True)):
                     if (self.GPinfo.yourTime is None):
                         self.saveYourGrabTime_ms()
                     self.opponentRespondsInGrabPhase()
                     self.decideWinner()
+            if (self.phase is Phase.OPPONENT_TRANSFER):
+                self.opponentTransfers()
+            if (self.phase is Phase.YOUR_TRANSFER):
+                self.renderDoneButton()
+            if (self.phase is Phase.RESET):
+                self.reset()
 
             pygame.display.flip()  # update rendering contents
             self.clock.tick(self.GUIParameters.FPS)
