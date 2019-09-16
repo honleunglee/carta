@@ -17,7 +17,8 @@ class GUIParameters:  # const parameters
         self.screenHeight = 563  # 16:9 ratio
         self.FPS = 30  # upper bound per frames per second
         self.windowName = "Carta"
-        self.fontFile = "ttf-bitstream-vera-1.10/Vera.ttf"
+        self.fontFile = "fonts/ttf-bitstream-vera-1.10/Vera.ttf"
+        self.JPFontFile = "fonts/ipaexg00401/ipaexg.ttf"
         self.cardWidth = 52
         self.cardHeight = 73
         self.wordBoxWidth = 270  # Width for wordBox from reading card
@@ -30,7 +31,7 @@ class GUIParameters:  # const parameters
         self.fontSize = 12
         self.wordFontSize = 24  # for reading card word font size
         self.buttonFontSize = 18
-        self.dialogWordFont = 14
+        self.dialogFontSize = 14
         self.numCardRows = 6
         self.leftMargin = 20  # for grabbing cards in the screen
         self.topMargin = 20  # for grabbing cards in the screen
