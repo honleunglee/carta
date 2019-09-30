@@ -144,7 +144,7 @@ class Dialogs:
     def pop(self):
         self.list.pop(0)
 
-    def append(self, s):  # maximum of two line of dialog
+    def append(self, s):
         stringList = s.split(' ')
         maxIndex = len(stringList) - 1
         wordIndex = 0
@@ -169,39 +169,3 @@ class Dialogs:
             oneLineText = ' '.join(stringList[endIndex:(wordIndex + 1)])
             endIndex = wordIndex
             self.list.append(oneLineText)
-
-"""
-        while numAppendedChars < len(s):
-            text = ""
-            endIndex = numAppendedChars + self.maxNumChar
-            # numAppendedChars += self.maxNumChar
-            if (len(s) > endIndex):
-                if (s[endIndex] == " "):
-                    text = s[numAppendedChars: endIndex + 1]
-                    self.list.append(text)
-                elif (endIndex + 1 < len(s)):
-                    if (s[endIndex + 1] == " "):
-                        text = s[numAppendedChars: endIndex + 2]
-
-            for i in range(len(self.dialogs)):
-                textsurface = None
-                index = 0
-                if (len(self.dialogs[i]) > self.parameters.maxDialogChar):
-                    if (self.dialogs[i][self.parameters.maxDialogChar] == " "): 25
-                        text = self.dialogs[i][index:index + self.parameters.maxDialogChar]
-                        textsurface = self.dialogFont.render(self.dialogs[i][index:index + self.parameters.maxDialogChar],
-                                                             False, self.colors.black)
-                    elif (self.dialogs[i][self.parameters.maxDialogChar + 1] == " "): 26
-                        index += 1
-                        textsurface = self.dialogFont.render(self.dialogs[i][index:index + self.parameters.maxDialogChar],
-                                                             False, self.colors.black)
-                    else:
-                        index = self.parameters.maxDialogChar
-                        while textsurface is None:
-                            if (self.dialogs[i][index] == " "):
-                                textsurface = self.dialogFont.render(
-                                    self.dialogs[i][0:index + self.parameters.maxDialogChar], False, self.colors.black)
-                            index -= 1
-                else:
-                    textsurface = self.dialogFont.render(self.dialogs[i], False, self.colors.black)
-"""

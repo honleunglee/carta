@@ -723,6 +723,7 @@ class Carta:
             self.numReadCardChars = 0
             self.displayReadingCard = True
 
+    # Execution of grabbing phase
     def grab(self):
         if ((self.GPInfo.decisionWordAppeared) and \
             (self.GPInfo.oppoResponded is False)):

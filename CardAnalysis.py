@@ -1,3 +1,4 @@
+import os
 import sys
 
 if sys.version_info[0] < 3:
@@ -6,8 +7,11 @@ else:
     exec (open("Cards.py").read())
 
 def generateReadingCardList(txtFilename, numReadingCards):
-    output = []
+    if os.access(txtFilename, os.R_OK) is False:
+        raise ValueError("CardAnalysis.py: generateReadingCardList: " + txtFilename + " does not exist" + \
+                         " or is non-readable, so no reading card list is generated!")
 
+    output = []
     f = open(txtFilename, "r")
     lines = f.readlines()
     f.close()
@@ -27,15 +31,8 @@ def generateReadingCardList(txtFilename, numReadingCards):
                          " processed is " + str(lineNumber) + " but not " + str(numReadingCards) + ".")
     return output
 
-def generatePureGrabCardList(readingCardList):
-    return [PureGrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
-
 def generateGrabbingCardList(readingCardList):
-    return [GrabbingCard(readingCardList[i].getLastWord()) for i in range(len(readingCardList))]
-
-READING_CARDS = generateReadingCardList("ReadingCards.txt", 100)
-PURE_GRABBING_CARDS = generatePureGrabCardList(READING_CARDS)
-GRABBING_CARDS = generateGrabbingCardList(READING_CARDS)
+    return [GrabbingCard(card.getLastWord()) for card in readingCardList]
 
 def sortFirstWords(readingCardList):
     firstWordList = []
@@ -58,9 +55,9 @@ def assignGrabbingCards(readingCardList, grabbingCardList):
     return firstWordToGrabbingCardMap
 
 def searchReadingCard(readingCardList, sortedFirstWord):
-    for i in range(len(readingCardList)):
-        if (readingCardList[i].getFirstWord() == sortedFirstWord):
-            return readingCardList[i]
+    for card in readingCardList:
+        if (card.getFirstWord() == sortedFirstWord):
+            return card
 
 def assignDecisionWords(readingCardList, indexToGrabbingCardMap):
     sortedFirstWords = sortFirstWords(readingCardList)
@@ -111,7 +108,6 @@ def analyzeCards(readingCardList, grabbingCardList):
 
     firstWordToGrabbingCardMap = assignGrabbingCards(readingCardList, grabbingCardList)
     assignDecisionWords(readingCardList, firstWordToGrabbingCardMap)
-    decisionWordLengthList = createDecWordLenList(grabbingCardList)
     """
     for i in range(len(firstWordList)):
         if (len(firstWordToGrabbingCardMap[firstWordList[i]].decisionWord) >=
@@ -119,8 +115,54 @@ def analyzeCards(readingCardList, grabbingCardList):
             print(firstWordList[i] + " " +
                   firstWordToGrabbingCardMap[firstWordList[i]].decisionWord)
 
+    decisionWordLengthList = createDecWordLenList(grabbingCardList)
     for i in decisionWordLengthList:
         print(str(i) + " " + str(decisionWordLengthList[i]))
     """
 
-analyzeCards(READING_CARDS, GRABBING_CARDS)
+# Use decisionWordsTxtFile to update readingCardList and grabbingCardList
+def readDecisionWordsFileAndUpdate(readingCardList, grabbingCardList, decisionWordsTxtFile):
+    f = open(decisionWordsTxtFile, "r")
+    lines = f.readlines()
+    f.close()
+
+    lineNumber = 0
+    for line in lines:
+        wordsList = line.split()
+        if (len(wordsList) > 2):
+            # readingCardList may already have decision words because of analyzeCards function
+            if (readingCardList[lineNumber].getDecisionWord() is None):
+                readingCardList[lineNumber].setDecisionWord(wordsList[2])
+            # grabbingCardList must not have decision words at initialization
+            grabbingCardList[lineNumber].setDecisionWord(wordsList[2])
+        else:
+            raise ValueError("CardAnalysis.py: writeDecisionWords: no decision word at line " + \
+                  str(lineNumber + 1))
+        lineNumber += 1
+
+# Take a reading card list, and write the decision words to a text file
+def writeDecisionWordsToFile(decisionWordsTxtFile, readingCardList):
+    f = open(decisionWordsTxtFile, "w+")  # + means if file does not exist then make a new one
+    for card in readingCardList:
+        f.write(card.getFullWord() + " " + card.getDecisionWord() + "\n")
+    f.close()
+
+# Do not put .txt in txtFileName argument
+def writeDecisionWords(readingCardList, grabbingCardList, txtFilename):
+    # Check if decision words are already written in a specific file
+    decisionWordsTxtFile = txtFilename + "WithDecisionWords.txt"
+    canReadDecisionWordsTxtFile = os.access(decisionWordsTxtFile, os.R_OK)
+    if canReadDecisionWordsTxtFile is False:
+        analyzeCards(readingCardList, grabbingCardList)
+        writeDecisionWordsToFile(decisionWordsTxtFile, readingCardList)
+    readDecisionWordsFileAndUpdate(readingCardList, grabbingCardList, decisionWordsTxtFile)
+
+# Do not put .txt in txtFileName argument
+def generateCardListsWithDecisionWords(txtFilename, numReadingCards):
+    txtFileNameDotTxt = txtFilename + ".txt"
+    readingCardList = generateReadingCardList(txtFileNameDotTxt, numReadingCards)
+    grabbingCardList = generateGrabbingCardList(readingCardList)
+    writeDecisionWords(readingCardList, grabbingCardList, txtFilename)
+    return [readingCardList, grabbingCardList]
+
+[READING_CARDS, GRABBING_CARDS] = generateCardListsWithDecisionWords("ReadingCards/ReadingCards", 100)
