@@ -68,9 +68,10 @@ class Carta:
         self.doneButton = pygame.rect.Rect(self.GUIPars.doneButtonStart.x, self.GUIPars.doneButtonStart.y,
                                            self.GUIPars.buttonBoxWidth, self.GUIPars.buttonBoxHeight)
 
-        self.dialogs = []  # a queue for dialogs
+        self.dialogs = Dialogs(self.parameters.maxNumDialogChar)  # a queue for dialogs
 
         self.displayReadingCard = False  # True if to display reading card
+        self.printOppoGrabTime = False  # True if printed Opponent Relative Grabbing Time
 
     def initReadingCards(self):
         # Shuffle and put 50 cards into the readingCardStack
@@ -163,7 +164,7 @@ class Carta:
                 self.occupied[tuple(frame)] = True
 
             self.phase = Phase.YOUR_SET_UP
-            self.dialogs.append("Your Set Up Phase Starts")
+            self.dialogs.append("Your Set Up Phase Starts.")
 
         # change at run time
         self.grabbingCardsInPlay = self.yourGrabbingCards + self.opponentGrabbingCards
@@ -176,6 +177,7 @@ class Carta:
         if self.phase is Phase.RESET:
             self.GPInfo.reset()
             self.displayReadingCard = False
+            self.printOppoGrabTime = False
             self.displayReadCardStartTime = 0
             self.curReadingCard = None
             self.numReadCardChars = 0
@@ -184,7 +186,7 @@ class Carta:
             self.numCardsToTransfer = 0
 
             self.phase = Phase.YOUR_SET_UP
-            self.dialogs.append("Your Set Up Phase Starts")
+            self.dialogs.append("Your Set Up Phase Starts.")
 
     # 0 ms --> pygame.init(). Get current time relative to pygame.init().
     def getTime_ms(self):
@@ -227,11 +229,11 @@ class Carta:
 
     def renderDialogBox(self):
         pygame.draw.rect(self.screen, self.colors.white, self.dialogBox)
-        if (len(self.dialogs) > 0):
-            if (len(self.dialogs) >= self.GUIPars.maxNumDialogRows):
-                self.dialogs.pop(0)
-            for i in range(len(self.dialogs)):
-                textsurface = self.dialogFont.render(self.dialogs[i], False, self.colors.black)
+        if (self.dialogs.length() > 0):
+            while (self.dialogs.length() >= self.GUIPars.maxNumDialogRows):
+                self.dialogs.pop()
+            for i in range(self.dialogs.length()):
+                textsurface = self.dialogFont.render(self.dialogs.at(i), False, self.colors.black)
                 self.screen.blit(textsurface,
                                  (self.dialogBox.x + self.GUIPars.dialogLeftMargin,
                                   self.dialogBox.y + self.GUIPars.dialogTopMargin + (i * self.GUIPars.dialogsSpacing)))
@@ -291,6 +293,11 @@ class Carta:
             displayOneMoreChar):
             self.numReadCardChars += 1
 
+        if (self.curReadingCard.getFullWord()[:self.numReadCardChars] == self.curReadingCard.getDecisionWord()) and (
+                self.GPInfo.decisionWordAppeared is False):  # For clever AI
+            self.GPInfo.decisionWordAppearTime = self.getTime_ms() - self.GPInfo.startTime
+            self.GPInfo.decisionWordAppeared = True
+
         textsurface = self.wordFont.render(self.curReadingCard.getFullWord()[:self.numReadCardChars], False,
                                            self.colors.white)
 
@@ -323,7 +330,9 @@ class Carta:
 
     # Save the time where you grab a card
     def saveYourGrabTime_ms(self):
-        self.GPInfo.yourTime = self.getTime_ms()
+        self.GPInfo.yourTime = self.getTime_ms() - self.GPInfo.startTime
+        if (self.debugMode):
+            self.dialogs.append("Debug: You Grab at %.f ms." % (self.GPInfo.yourTime))
 
     def decideCorrectGrabCardStatus(self):
         for card in self.grabbingCardsInPlay:
@@ -360,7 +369,11 @@ class Carta:
                 self.GPInfo.yourStatus = status
                 self.saveYourGrabTime_ms()
 
-    # Stupid AI
+    def hasSomeoneTouched(self):
+        return ((self.GPInfo.yourStatus is not GrabPhaseStatus.NO_TOUCH) or \
+                (self.GPInfo.oppoStatus is not GrabPhaseStatus.NO_TOUCH))
+
+    # Clever AI
     # Note: opponent will not take a wrong card on the same side as the correct card.
     def opponentRespondsInGrabPhase(self):
         takeCorrectCard = False
@@ -384,7 +397,18 @@ class Carta:
                 self.GPInfo.oppoStatus = GrabPhaseStatus.FALSE_TOUCH
                 break
 
-        self.GPInfo.opponentTime = self.GPInfo.startTime + self.parameters.opponentTimeForStupidAI
+        self.GPInfo.oppoResponded = True
+
+        if (self.GPInfo.oppoGrabCard is not None):
+            self.GPInfo.opponentTime = min(self.parameters.cleverAIScale * self.GPInfo.decisionWordAppearTime,
+                                           self.parameters.maxGrabbingTime)
+        else:
+            self.GPInfo.opponentTime = self.parameters.maxGrabbingTime
+
+        if ((self.printOppoGrabTime is False) and (self.debugMode)):
+            self.dialogs.append("Debug: Dec'n word: " + self.curReadingCard.getDecisionWord() + ".")
+            self.dialogs.append("Debug: Opponent grabs at %.f ms." % (self.GPInfo.opponentTime))
+            self.printOppoGrabTime = True
 
         if (self.debugMode):
             if (self.GPInfo.oppoStatus is GrabPhaseStatus.TRUE_TOUCH):
@@ -441,28 +465,28 @@ class Carta:
 
     def appendDialogsWhenDecidingWinner(self):
         if ((self.GPInfo.youWin) and not (self.GPInfo.opponentWin)):
-            self.dialogs.append("You Win, Opponent Loses")
+            self.dialogs.append("You Win, Opponent Loses.")
         elif (not (self.GPInfo.youWin) and (self.GPInfo.opponentWin)):
-            self.dialogs.append("Opponent Wins, You Lose")
+            self.dialogs.append("Opponent Wins, You Lose.")
         elif ((self.GPInfo.youWin) and (self.GPInfo.opponentWin)):
-            self.dialogs.append("Both Players Win")
+            self.dialogs.append("Both Players Win.")
         elif (not (self.GPInfo.youWin) and not (self.GPInfo.opponentWin)):
-            self.dialogs.append("No one Wins")
+            self.dialogs.append("No one Wins.")
 
         if (self.phase == Phase.YOUR_TRANSFER):
-            self.dialogs.append("Your Transfer Starts")
+            self.dialogs.append("Your Transfer Starts.")
             if (self.numCardsToTransfer > 1):
-                self.dialogs.append("You give " + str(self.numCardsToTransfer) + " cards to opponent")
+                self.dialogs.append("You give " + str(self.numCardsToTransfer) + " cards to opponent.")
             else:
-                self.dialogs.append("You give " + str(self.numCardsToTransfer) + " card to opponent")
+                self.dialogs.append("You give " + str(self.numCardsToTransfer) + " card to opponent.")
         elif (self.phase == Phase.OPPONENT_TRANSFER):
-            self.dialogs.append("Opponent Transfer Starts")
+            self.dialogs.append("Opponent Transfer Starts.")
             if (self.numCardsToTransfer > 1):
-                self.dialogs.append("Opponent gives " + str(self.numCardsToTransfer) + " cards to you")
+                self.dialogs.append("Opponent gives " + str(self.numCardsToTransfer) + " cards to you.")
             else:
-                self.dialogs.append("Opponent gives " + str(self.numCardsToTransfer) + " card to you")
+                self.dialogs.append("Opponent gives " + str(self.numCardsToTransfer) + " card to you.")
         elif (self.phase == Phase.END_GAME):
-            self.dialogs.append("Game Ends")
+            self.dialogs.append("Game Ends.")
 
     def decideWinner(self):
         self.phase = Phase.RESET
@@ -651,13 +675,13 @@ class Carta:
             (self.phase == Phase.YOUR_SET_UP) and \
             (self.numYourFramesOccupied >= self.numYourGrabCardInPlay)):
             self.phase = Phase.GRABBING
-            self.dialogs.append("Grabbing Phase Starts")
+            self.dialogs.append("Grabbing Phase Starts.")
             self.displayReadCardStartTime = self.getTime_ms()
 
         if ((self.doneButton.collidepoint(event.pos)) and \
             (self.phase == Phase.YOUR_TRANSFER)):
             if (self.numCardsToTransfer != 0):
-                self.dialogs.append("Still have " + str(self.numCardsToTransfer) + " cards to Transfer")
+                self.dialogs.append("Still have " + str(self.numCardsToTransfer) + " cards to Transfer.")
             elif (self.numCardsToTransfer == 0):
                 selectedTransferCards = []
                 for card in self.grabbingCardsInPlay:
@@ -698,6 +722,19 @@ class Carta:
             self.curReadingCard = self.readingCardStack.drawOneCard()
             self.numReadCardChars = 0
             self.displayReadingCard = True
+
+    def grab(self):
+        if ((self.GPInfo.decisionWordAppeared) and \
+            (self.GPInfo.oppoResponded is False)):
+            self.opponentRespondsInGrabPhase()
+
+        if (self.hasSomeoneTouched()):
+            self.decideWinner()
+
+        if (self.GPInfo.timesUp is True):
+            if (self.GPInfo.yourTime is None):
+                self.saveYourGrabTime_ms()
+            self.decideWinner()
 
     # return selected Card if any
     def handleEvent(self, event, selectedCard, mouse, offset):
@@ -774,12 +811,8 @@ class Carta:
                     self.saveGrabPhaseStartTime_ms()
                 self.checkTimesUp()
                 self.renderReadingCardWords()
-                if ((self.phase is Phase.GRABBING) and \
-                    (self.GPInfo.timesUp is True)):
-                    if (self.GPInfo.yourTime is None):
-                        self.saveYourGrabTime_ms()
-                    self.opponentRespondsInGrabPhase()
-                    self.decideWinner()
+                if (self.phase is Phase.GRABBING):
+                    self.grab()
             if (self.phase is Phase.OPPONENT_TRANSFER):
                 self.opponentTransfers()
             if (self.phase is Phase.YOUR_TRANSFER):

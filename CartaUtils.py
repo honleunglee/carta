@@ -56,6 +56,7 @@ class GUIParameters:  # const parameters
         self.dialogTopMargin = 5
         self.dialogsSpacing = 14
         self.maxNumDialogRows = 21
+        self.maxDialogChar = 25
 
 # Carta Game Phase enum (in python 3, import enum as Enum)
 # Phase order 1-2-3-4-5-1-2-3-4-5...... until one player has no cards --> 6
@@ -83,6 +84,7 @@ class GrabPhaseInfo:
         self.yourTime = None  # time of pressing the grabbing card
         self.oppoGrabCardLastWord = ""
         self.opponentTime = None  # time of opponent pressing the grabbing card
+        self.oppoResponded = False
         self.timesUp = False
         self.youWin = False
         self.opponentWin = False
@@ -94,14 +96,17 @@ class GrabPhaseInfo:
         # correct grabbing card not available,
         # on your side, or on opponent's side
         self.correctGrabCardStatus = GrabCardStatus.INVALID
+        self.decisionWordAppearTime = 0
+        self.decisionWordAppeared = False
 
     def reset(self):
         self.savedStartTime = False
         self.startTime = 0  # time of the grabbing phase's start
         self.yourGrabCardLastWord = ""
-        self.yourTime = None  # time of pressing the grabbing card
+        self.yourTime = None  # time of pressing the grabbing card, relative time
         self.oppoGrabCardLastWord = ""
-        self.opponentTime = None  # time of opponent pressing the grabbing card
+        self.opponentTime = None  # time of opponent pressing the grabbing card, relative time
+        self.oppoResponded = False
         self.timesUp = False
         self.youWin = False
         self.opponentWin = False
@@ -113,9 +118,90 @@ class GrabPhaseInfo:
         # correct grabbing card not available,
         # on your side, or on opponent's side
         self.correctGrabCardStatus = GrabCardStatus.INVALID
+        self.decisionWordAppearTime = 0
+        self.decisionWordAppeared = False
 
 class CartaParameters:  # constant parameters
     def __init__(self):
         self.opponentTimeForStupidAI = 10000  # ms
         self.maxGrabbingTime = 18000  # ms
         self.opponentSuccessProb = 0.8
+        self.maxGrabbingRatio = 1.16
+        self.cleverAIScale = 1.0
+        self.maxNumDialogChar = 26
+
+class Dialogs:
+    def __init__(self, num):
+        self.list = []  # queue
+        self.maxNumChar = num
+
+    def at(self, i):
+        return self.list[i]
+
+    def length(self):
+        return len(self.list)
+
+    def pop(self):
+        self.list.pop(0)
+
+    def append(self, s):  # maximum of two line of dialog
+        stringList = s.split(' ')
+        maxIndex = len(stringList) - 1
+        wordIndex = 0
+        endIndex = 0
+        newLine = False
+        while endIndex < maxIndex:
+            numAppendedChars = 0
+            oneLineText = ""
+            if (newLine):
+                endIndex += 1
+                newLine = False
+            while (numAppendedChars + len(stringList[wordIndex]) + 1 <= self.maxNumChar):
+                numAppendedChars += len(stringList[wordIndex]) + 1
+                if (wordIndex < maxIndex):
+                    if (numAppendedChars + len(stringList[wordIndex + 1]) + 1 <= self.maxNumChar):
+                        wordIndex += 1
+                    else:
+                        newLine = True
+                        break
+                else:
+                    break
+            oneLineText = ' '.join(stringList[endIndex:(wordIndex + 1)])
+            endIndex = wordIndex
+            self.list.append(oneLineText)
+
+"""
+        while numAppendedChars < len(s):
+            text = ""
+            endIndex = numAppendedChars + self.maxNumChar
+            # numAppendedChars += self.maxNumChar
+            if (len(s) > endIndex):
+                if (s[endIndex] == " "):
+                    text = s[numAppendedChars: endIndex + 1]
+                    self.list.append(text)
+                elif (endIndex + 1 < len(s)):
+                    if (s[endIndex + 1] == " "):
+                        text = s[numAppendedChars: endIndex + 2]
+
+            for i in range(len(self.dialogs)):
+                textsurface = None
+                index = 0
+                if (len(self.dialogs[i]) > self.parameters.maxDialogChar):
+                    if (self.dialogs[i][self.parameters.maxDialogChar] == " "): 25
+                        text = self.dialogs[i][index:index + self.parameters.maxDialogChar]
+                        textsurface = self.dialogFont.render(self.dialogs[i][index:index + self.parameters.maxDialogChar],
+                                                             False, self.colors.black)
+                    elif (self.dialogs[i][self.parameters.maxDialogChar + 1] == " "): 26
+                        index += 1
+                        textsurface = self.dialogFont.render(self.dialogs[i][index:index + self.parameters.maxDialogChar],
+                                                             False, self.colors.black)
+                    else:
+                        index = self.parameters.maxDialogChar
+                        while textsurface is None:
+                            if (self.dialogs[i][index] == " "):
+                                textsurface = self.dialogFont.render(
+                                    self.dialogs[i][0:index + self.parameters.maxDialogChar], False, self.colors.black)
+                            index -= 1
+                else:
+                    textsurface = self.dialogFont.render(self.dialogs[i], False, self.colors.black)
+"""

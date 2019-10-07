@@ -6,9 +6,13 @@ class ReadingCard:
         self.lastWord = lastWord
         self.index = -1
         self.fullWord = firstWord + " " + lastWord
+        self.decisionWord = None
 
     def setIndex(self, i):
         self.index = i
+
+    def setDecisionWord(self, word):
+        self.decisionWord = word
 
     def getFirstWord(self):
         return self.firstWord
@@ -22,6 +26,9 @@ class ReadingCard:
     def getIndex(self):
         return self.index
 
+    def getDecisionWord(self):
+        return self.decisionWord
+
 class PureGrabbingCard:
     def __init__(self, lastWord):
         self.lastWord = lastWord
@@ -33,6 +40,9 @@ class PureGrabbingCard:
 
     def setIndex(self, i):
         self.index = i
+
+    def getDecisionWord(self):
+        return self.decisionWord
 
     def getLastWord(self):
         return self.lastWord
