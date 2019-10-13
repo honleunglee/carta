@@ -317,14 +317,13 @@ class Carta:
                          (self.doneButton.x + (self.GUIPars.buttonBoxWidth - width) // 2, \
                           self.doneButton.y + (self.GUIPars.buttonBoxHeight - height) // 2))
 
+    def hasReachedTime(self, time):
+        return (self.getTime_ms() - self.GPInfo.startTime >= time)
+
     # Check if the time between start time and current time at least self.parameters.maxGrabbingTime
     def checkTimesUp(self):
-        if ((self.getTime_ms() - self.GPInfo.startTime >= self.parameters.maxGrabbingTime) and \
-            (self.GPInfo.timesUp is False)):
+        if ((self.hasReachedTime(self.parameters.maxGrabbingTime)) and (self.GPInfo.timesUp is False)):
             self.GPInfo.timesUp = True
-
-    def hasReachedOpponentGrabTime(self):
-        return (self.getTime_ms() - self.GPInfo.startTime >= self.GPInfo.opponentTime)
 
     # Save the starting time of the grabbing phase
     def saveGrabPhaseStartTime_ms(self):
@@ -409,7 +408,7 @@ class Carta:
 
         self.GPInfo.oppoResponded = True
 
-        if (self.GPInfo.oppoGrabCard is not None) and (oppoTakesCorrectCard):
+        if ((self.GPInfo.oppoGrabCard is not None) and oppoTakesCorrectCard):
             self.GPInfo.opponentTime = min(self.parameters.cleverAIScale * self.GPInfo.decisionWordAppearTime,
                                            self.parameters.maxGrabbingTime)
         elif (self.GPInfo.oppoGrabCard is None):
@@ -738,7 +737,8 @@ class Carta:
         oppoTakesCorrectCardAndDecisionWordAppeared = (self.GPInfo.decisionWordAppeared and \
                                                        oppoTakesCorrectCard)
 
-        oppoTakesWrongCardAndReachesTime = ((not oppoTakesCorrectCard) and self.hasReachedOpponentGrabTime())
+        oppoTakesWrongCardAndReachesTime = ((not oppoTakesCorrectCard) and \
+                                            self.hasReachedTime(self.GPInfo.opponentTime))
 
         opponentNeedsToRespond = ((self.GPInfo.oppoResponded is False) and \
                                   (oppoTakesCorrectCardAndDecisionWordAppeared or \
