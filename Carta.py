@@ -323,6 +323,9 @@ class Carta:
             (self.GPInfo.timesUp is False)):
             self.GPInfo.timesUp = True
 
+    def hasReachedOpponentGrabTime(self):
+        return (self.getTime_ms() - self.GPInfo.startTime >= self.GPInfo.opponentTime)
+
     # Save the starting time of the grabbing phase
     def saveGrabPhaseStartTime_ms(self):
         self.GPInfo.startTime = self.getTime_ms()
@@ -341,6 +344,14 @@ class Carta:
                 self.GPInfo.correctGrabCard = card
                 if (self.debugMode):
                     card.setColor(self.colors.red)
+
+    def decideOpponentTakingCorrectCardAndGrabbingTime(self):
+        oppoTakesCorrectCard = self.opponentTakesCorrectGrabCard()
+        if (not oppoTakesCorrectCard):
+            random.seed(time.time())
+            p = random.uniform(0, 1)
+            self.GPInfo.opponentTime = self.parameters.maxGrabbingTime * p
+        return oppoTakesCorrectCard
 
     # returns true if and only if
     # 1) the correct grabbing card is on the opposite side of the touched grabbing card; OR
@@ -373,24 +384,23 @@ class Carta:
         return ((self.GPInfo.yourStatus is not GrabPhaseStatus.NO_TOUCH) or \
                 (self.GPInfo.oppoStatus is not GrabPhaseStatus.NO_TOUCH))
 
-    # Clever AI
-    # Note: opponent will not take a wrong card on the same side as the correct card.
-    def opponentRespondsInGrabPhase(self):
-        takeCorrectCard = False
+    def opponentTakesCorrectGrabCard(self):
         random.seed(time.time())
         x = random.uniform(0, 1)
-        if (x <= self.parameters.opponentSuccessProb):
-            takeCorrectCard = True
+        return (x <= self.parameters.opponentSuccessProb)
 
+    # Clever AI
+    # Note: opponent will not take a wrong card on the same side as the correct card.
+    def opponentRespondsInGrabPhase(self, oppoTakesCorrectCard):
         for card in self.grabbingCardsInPlay:
             if ((card.getLastWord() == self.curReadingCard.getLastWord()) and \
-                (takeCorrectCard)):
+                (oppoTakesCorrectCard)):
                 self.GPInfo.oppoGrabCardLastWord = card.getLastWord()
                 self.GPInfo.oppoGrabCard = card
                 self.GPInfo.oppoStatus = GrabPhaseStatus.TRUE_TOUCH
                 break
             elif ((card.getLastWord() != self.curReadingCard.getLastWord()) and \
-                  (not takeCorrectCard) and \
+                  (not oppoTakesCorrectCard) and \
                   self.isFalseTouch(self.GPInfo.correctGrabCardStatus, card.getStatus())):
                 self.GPInfo.oppoGrabCardLastWord = card.getLastWord()
                 self.GPInfo.oppoGrabCard = card
@@ -399,10 +409,10 @@ class Carta:
 
         self.GPInfo.oppoResponded = True
 
-        if (self.GPInfo.oppoGrabCard is not None):
+        if (self.GPInfo.oppoGrabCard is not None) and (oppoTakesCorrectCard):
             self.GPInfo.opponentTime = min(self.parameters.cleverAIScale * self.GPInfo.decisionWordAppearTime,
                                            self.parameters.maxGrabbingTime)
-        else:
+        elif (self.GPInfo.oppoGrabCard is None):
             self.GPInfo.opponentTime = self.parameters.maxGrabbingTime
 
         if ((self.printOppoGrabTime is False) and (self.debugMode)):
@@ -724,10 +734,18 @@ class Carta:
             self.displayReadingCard = True
 
     # Execution of grabbing phase
-    def grab(self):
-        if ((self.GPInfo.decisionWordAppeared) and \
-            (self.GPInfo.oppoResponded is False)):
-            self.opponentRespondsInGrabPhase()
+    def grab(self, oppoTakesCorrectCard):
+        oppoTakesCorrectCardAndDecisionWordAppeared = (self.GPInfo.decisionWordAppeared and \
+                                                       oppoTakesCorrectCard)
+
+        oppoTakesWrongCardAndReachesTime = ((not oppoTakesCorrectCard) and self.hasReachedOpponentGrabTime())
+
+        opponentNeedsToRespond = ((self.GPInfo.oppoResponded is False) and \
+                                  (oppoTakesCorrectCardAndDecisionWordAppeared or \
+                                   oppoTakesWrongCardAndReachesTime))
+
+        if (opponentNeedsToRespond):
+            self.opponentRespondsInGrabPhase(oppoTakesCorrectCard)
 
         if (self.hasSomeoneTouched()):
             self.decideWinner()
@@ -794,6 +812,7 @@ class Carta:
         mouse = Point(0, 0)
         # record left top corner of the selected card relative to mouse position
         offset = Point(0, 0)
+        oppoTakesCorrectCard = False
         while self.running:
             for event in pygame.event.get():
                 selectedCard = self.handleEvent(event, selectedCard, mouse, offset)
@@ -809,11 +828,12 @@ class Carta:
             if (self.displayReadingCard):
                 if (self.GPInfo.savedStartTime is False):
                     self.decideCorrectGrabCardStatus()
+                    oppoTakesCorrectCard = self.decideOpponentTakingCorrectCardAndGrabbingTime()
                     self.saveGrabPhaseStartTime_ms()
                 self.checkTimesUp()
                 self.renderReadingCardWords()
                 if (self.phase is Phase.GRABBING):
-                    self.grab()
+                    self.grab(oppoTakesCorrectCard)
             if (self.phase is Phase.OPPONENT_TRANSFER):
                 self.opponentTransfers()
             if (self.phase is Phase.YOUR_TRANSFER):
